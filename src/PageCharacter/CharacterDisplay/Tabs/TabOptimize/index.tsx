@@ -38,7 +38,7 @@ import { objectKeyValueMap, objPathValue, range } from '../../../../Util/Util';
 import { FinalizeResult, Setup, WorkerCommand, WorkerResult } from './BackgroundWorker';
 import { maxBuildsToShowList } from './Build';
 import useBuildSetting from './useBuildSetting';
-import { artSetPerm, Build, filterFeasiblePerm, mergeBuilds, mergePlot, pruneAll, RequestFilter } from './common';
+import { Build, mergeBuilds, mergePlot, pruneAll } from './common';
 import ArtifactSetConfig from './Components/ArtifactSetConfig';
 import AssumeFullLevelToggle from './Components/AssumeFullLevelToggle';
 import BonusStatsCard from './Components/BonusStatsCard';

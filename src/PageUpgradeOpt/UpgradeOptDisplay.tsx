@@ -12,11 +12,8 @@ import CardDark from '../Components/Card/CardDark';
 import CardLight from '../Components/Card/CardLight';
 import CharacterDropdownButton from './stopBreakingMe';
 import { DatabaseContext } from '../Database/Database';
-import { initialCharacter } from '../ReactHooks/useCharSelectionCallback';
 import { CharacterKey } from '../Types/consts';
 import { useNavigate } from "react-router";
-import CharacterSheet from "../Data/Characters/CharacterSheet";
-import { defaultInitialWeapon } from "../Util/WeaponUtil";
 
 function HackyGetAroun() {
   const { database } = useContext(DatabaseContext)
