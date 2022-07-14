@@ -1,7 +1,7 @@
 import { faCalculator } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { CheckBox, CheckBoxOutlineBlank, Close } from '@mui/icons-material';
-import { Alert, Box, Button, ButtonGroup, CardContent, Divider, Grid, Link, MenuItem, Skeleton, ToggleButton, Typography } from '@mui/material';
+import { Alert, Box, Button, ButtonGroup, CardContent, Divider, Grid, Link, MenuItem, Skeleton, ToggleButton, Typography, Pagination } from '@mui/material';
 import React, { Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link as RouterLink } from 'react-router-dom';
@@ -53,6 +53,7 @@ import { defThreads, useOptimizeDBState } from './DBState';
 import { compactArtifacts, dynamicData } from './foreground';
 import { OptimizationTargetContext } from '../../../../Context/OptimizationTargetContext';
 import { countBuildsU, problemSetup, SubProblem, toArtifactBySlotVec } from './subproblemUtil';
+import CardDark from '../../../../Components/Card/CardDark';
 
 export default function TabBuild() {
   const { t } = useTranslation("page_character")
@@ -81,6 +82,15 @@ export default function TabBuild() {
   const teamData = useTeamData(characterKey, mainStatAssumptionLevel)
   const { characterSheet, target: data } = teamData?.[characterKey as CharacterKey] ?? {}
   const buildsArts = useMemo(() => builds.map(build => build.map(i => database.arts.get(i)!)), [builds, database])
+  const numBuilds = buildsArts.length
+
+  const [currentPageIndex, setCurrentPageIndex] = useState(0)
+  const { numPages } = useMemo(() => {
+    return { numPages: Math.ceil(numBuilds / maxArtsToShowPerPage) }
+  }, [numBuilds])
+  const setPageIdx = useCallback((e, value: number) => {
+    setCurrentPageIndex(value - 1)
+  }, [setCurrentPageIndex])
 
   //register changes in artifact database
   useEffect(() =>
@@ -158,13 +168,6 @@ export default function TabBuild() {
     const plotBaseNode = plotBase ? nodes.pop() : undefined
     optimizationTargetNode = nodes.pop()!
 
-    // var outcnt = 0
-    // forEachNodes([optimizationTargetNode], _ => { }, n => outcnt++)
-    // console.log('Original count', outcnt)
-    // debugHorny(expandPoly(optimizationTargetNode))
-    // debugMe(optimizationTargetNode, arts)
-    // console.log('artSetExclusion', artSetExclusion)
-
     const artSetExclFull = objectKeyValueMap(Object.entries(artSetExclusion), ([setKey, v]) => {
       if (setKey === 'rainbow') return ['uniqueKey', v.map(v => v + 1)]
       return [setKey, v.flatMap(v => (v === 2) ? [2, 3] : [4, 5])]
@@ -175,15 +178,6 @@ export default function TabBuild() {
       .filter(x => x.min > -Infinity)
     const artsVec = toArtifactBySlotVec(arts)
     const initialProblem = problemSetup(artsVec, { optimizationTargetNode, nodes, minimum, artSetExclusion })
-    // const initialProblem: SubProblem = {
-    //   cache: false,
-    //   optimizationTarget: expandPoly(optimizationTargetNode),
-    //   constraints: filtersEP,
-    //   artSetExclusion: artSetExclFull,
-
-    //   filter: { ...emptyfilter, uType: false },
-    //   depth: 0,
-    // }
 
     const masterInfo = { id: -1, ready: true }
     const maxSplitIters = 5
@@ -338,9 +332,10 @@ export default function TabBuild() {
       const builds = mergeBuilds(results.map(x => x.builds), maxBuildsToShow)
       if (process.env.NODE_ENV === "development") console.log("Build Result", builds)
       buildSettingDispatch({ builds: builds.map(build => build.artifactIds), buildDate: Date.now() })
+      setCurrentPageIndex(0)
     }
     setBuildStatus({ ...status, type: "inactive", finishTime: performance.now() })
-  }, [characterKey, database, buildSettingDispatch, maxWorkers, buildSetting, equipmentPriority])
+  }, [characterKey, database, buildSettingDispatch, maxWorkers, buildSetting, equipmentPriority, setCurrentPageIndex])
 
   const characterName = characterSheet?.name ?? "Character Name"
 
@@ -488,31 +483,38 @@ export default function TabBuild() {
           </Grid>
         </CardContent>
       </CardLight>
+
+      {numPages > 1 && <PageBrowser numPages={numPages} pageIdx={currentPageIndex} setPageIdex={setPageIdx} />}
       <OptimizationTargetContext.Provider value={optimizationTarget}>
-        <BuildList buildsArts={buildsArts} characterKey={characterKey} data={data} compareData={compareData} disabled={!!generatingBuilds} />
+        <BuildList buildsArts={buildsArts} characterKey={characterKey} data={data} compareData={compareData} disabled={!!generatingBuilds} pageIdx={currentPageIndex} />
       </OptimizationTargetContext.Provider>
+      {numPages > 1 && <PageBrowser numPages={numPages} pageIdx={currentPageIndex} setPageIdex={setPageIdx} />}
     </DataContext.Provider>}
   </Box>
 }
-function BuildList({ buildsArts, characterKey, data, compareData, disabled }: {
+
+const maxArtsToShowPerPage = 5
+function BuildList({ buildsArts, characterKey, data, compareData, disabled, pageIdx }: {
   buildsArts: ICachedArtifact[][],
   characterKey?: "" | CharacterKey,
   data?: UIData,
   compareData: boolean,
   disabled: boolean,
+  pageIdx: number,
 }) {
   // Memoize the build list because calculating/rendering the build list is actually very expensive, which will cause longer optimization times.
   const list = useMemo(() => <Suspense fallback={<Skeleton variant="rectangular" width="100%" height={600} />}>
-    {buildsArts?.map((build, index) => characterKey && data && <DataContextWrapper
-      key={index + build.join()}
-      characterKey={characterKey}
-      build={build}
-      oldData={data}
-    >
-      <BuildDisplayItem index={index} compareBuild={compareData} disabled={disabled} />
-    </DataContextWrapper>
-    )}
-  </Suspense>, [buildsArts, characterKey, data, compareData, disabled])
+    {buildsArts?.slice(maxArtsToShowPerPage * pageIdx, maxArtsToShowPerPage * (pageIdx + 1))
+      .map((build, index) => characterKey && data && <DataContextWrapper
+        key={index + build.join()}
+        characterKey={characterKey}
+        build={build}
+        oldData={data}
+      >
+        <BuildDisplayItem index={maxArtsToShowPerPage * pageIdx + index} compareBuild={compareData} disabled={disabled} />
+      </DataContextWrapper>
+      )}
+  </Suspense>, [buildsArts, characterKey, data, compareData, disabled, pageIdx])
   return list
 }
 
@@ -530,4 +532,22 @@ function DataContextWrapper({ children, characterKey, build, oldData }: Prop) {
   return <DataContext.Provider value={providerValue}>
     {children}
   </DataContext.Provider>
+}
+
+function PageBrowser({ numPages, pageIdx, setPageIdex }: {
+  numPages: number,
+  pageIdx: number,
+  setPageIdex: (e: any, n: number) => void
+}) {
+  return <CardDark ><CardContent>
+    <Grid container>
+      <Grid item flexGrow={1}>
+        <Pagination count={numPages} page={pageIdx + 1} onChange={setPageIdex} />
+      </Grid>
+      <Grid item>
+        page {pageIdx + 1} / {numPages}
+        {/* <ShowingArt numShowing={artifactsToShow.length} total={artifactUpgradeOpts?.arts.length} /> */}
+      </Grid>
+    </Grid>
+  </CardContent></CardDark>
 }
