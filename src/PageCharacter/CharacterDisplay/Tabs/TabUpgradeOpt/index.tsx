@@ -5,7 +5,7 @@ import { Link as RouterLink } from 'react-router-dom';
 import CardDark from '../../../../Components/Card/CardDark';
 import CardLight from '../../../../Components/Card/CardLight';
 import CharacterCard from '../../../../Components/Character/CharacterCard';
-import StatFilterCard from '../../../../Components/StatFilterCard';
+import StatFilterCard from '../TabOptimize/Components/StatFilterCard';
 import ArtifactCard from "../../../../PageArtifact/ArtifactCard";
 import BonusStatsCard from '../TabOptimize/Components/BonusStatsCard';
 import { HitModeToggle, ReactionToggle } from '../../../../Components/HitModeEditor';
