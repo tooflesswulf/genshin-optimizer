@@ -100,6 +100,7 @@ export const allCharacterKeys = [
   "Zhongli",
   "KamisatoAyato",
   "Yelan",
+  "ShikanoinHeizou",
 ] as const
 
 export const allWeaponSwordKeys = [
@@ -108,6 +109,7 @@ export const allWeaponSwordKeys = [
   "BlackcliffLongsword",
   "CinnabarSpindle",
   "CoolSteel",
+  "KagotsurubeIsshin",
   "DarkIronSword",
   "DullBlade",
   "FavoniusSword",
