@@ -25,13 +25,16 @@ import useTeamData, { getTeamData } from '../../../../ReactHooks/useTeamData';
 import useBuildSetting from '../TabOptimize/useBuildSetting';
 import { dynamicData } from '../TabOptimize/foreground';
 import { allSlotKeys, CharacterKey, SlotKey } from '../../../../Types/consts';
-import { clamp, objPathValue } from '../../../../Util/Util';
+import { clamp, objectKeyMap, objPathValue } from '../../../../Util/Util';
 import { mergeData, uiDataForTeam } from '../../../../Formula/api';
 import { querySetup, evalArtifact, toQueryArtifact, cmpQ, QueryArtifact, QueryBuild, UpgradeOptResult } from './artifactQuery'
 import UpgradeOptChartCard from "./UpgradeOptChartCard"
 import { CheckBox, CheckBoxOutlineBlank } from '@mui/icons-material';
 import MainStatSelectionCard from '../TabOptimize/Components/MainStatSelectionCard';
 import { CharacterContext } from '../../../../Context/CharacterContext';
+import ArtifactLevelSlider from '../../../../Components/Artifact/ArtifactLevelSlider';
+import { ICachedArtifact } from '../../../../Types/artifact';
+import { DynStat } from '../TabOptimize/common';
 
 
 export default function TabUpopt() {
@@ -44,7 +47,7 @@ export default function TabUpopt() {
   const noArtifact = useMemo(() => !database.arts.values.length, [database])
 
   const { buildSetting, buildSettingDispatch } = useBuildSetting(characterKey)
-  const { optimizationTarget } = buildSetting
+  const { optimizationTarget, levelLow, levelHigh } = buildSetting
   const teamData = useTeamData(characterKey)
   const { characterSheet, target: data } = teamData?.[characterKey as CharacterKey] ?? {}
 
@@ -52,7 +55,7 @@ export default function TabUpopt() {
 
   const [show20, setShow20] = useState(true)
   const [check4th, setCheck4th] = useState(true)
-  const [useMainStatFilter, setUseMainStatFilter] = useState(false)
+  const [useFilters, setUseMainStatFilter] = useState(false)
 
   // Because upgradeOpt is a two-stage estimation method, we want to expand (slow-estimate) our artifacts lazily as they are needed.
   // Lazy method means we need to take care to never 'lift' any artifacts past the current page, since that may cause a user to miss artifacts
@@ -121,7 +124,7 @@ export default function TabUpopt() {
   )
 
   const generateBuilds = useCallback(async () => {
-    const { statFilters, optimizationTarget, mainStatKeys } = buildSetting
+    const { statFilters, optimizationTarget, mainStatKeys, levelLow, levelHigh, artSetExclusion } = buildSetting
 
     if (!characterKey || !optimizationTarget) return
     const teamData = await getTeamData(database, characterKey, 0, [])
@@ -139,19 +142,56 @@ export default function TabUpopt() {
       return { value: input.total[key], minimum: value }
     }).filter(x => x.value && x.minimum > -Infinity)
 
+    const equippedArts = database.chars.get(characterKey)?.equippedArtifacts ?? {} as StrictDict<SlotKey, string>
+    const curEquip: QueryBuild = objectKeyMap(allSlotKeys, slotKey => {
+      const art = database.arts.get(equippedArts[slotKey] ?? "")
+      return art ? toQueryArtifact(art) : undefined
+    })
+    const curEquipSetKeys = objectKeyMap(allSlotKeys, slotKey => {
+      const art = database.arts.get(equippedArts[slotKey] ?? "")
+      return art?.setKey ?? ''
+    })
+    function respectSexExclusion(art: ICachedArtifact) {
+      const newSK = { ...curEquipSetKeys }
+      newSK[art.slotKey] = art.setKey
+      const skc: DynStat = {}
+      allSlotKeys.forEach(slotKey => skc[newSK[slotKey]] = (skc[newSK[slotKey]] ?? 0) + 1)
+      let pass = Object.entries(skc).every(([setKey, num]) => {
+        if (!artSetExclusion[setKey]) return true
+        switch (num) {
+          case 0: case 1:
+            return true
+          case 2: case 3:
+            return !artSetExclusion[setKey].includes(2)
+          case 4: case 5:
+            return !artSetExclusion[setKey].includes(4)
+          default:
+            throw Error('error in respectSex: num > 5')
+        }
+      })
+      if (!pass) return false
+
+      if (!artSetExclusion['rainbow']) return true
+      const nRainbow = Object.values(skc).reduce((a, b) => a + (b % 2), 0)
+      switch (nRainbow) {
+        case 0: case 1:
+          return true
+        case 2: case 3:
+          return !artSetExclusion['rainbow'].includes(2)
+        case 4: case 5:
+          return !artSetExclusion['rainbow'].includes(4)
+        default:
+          throw Error('error in respectSex: nRainbow > 5')
+      }
+    }
+
     const queryArts: QueryArtifact[] = database.arts.values
       .filter(art => art.rarity === 5)
+      .filter(respectSexExclusion)
       .filter(art => show20 || art.level !== 20)
-      .filter(art => !useMainStatFilter || !mainStatKeys[art.slotKey]?.length || mainStatKeys[art.slotKey]?.includes(art.mainStatKey))
-      // .filter(art => true)
+      .filter(art => !useFilters || !mainStatKeys[art.slotKey]?.length || mainStatKeys[art.slotKey]?.includes(art.mainStatKey))
+      .filter(art => !useFilters || (levelLow <= art.level && art.level <= levelHigh))
       .map(art => toQueryArtifact(art, 20))
-
-    const equippedArts = database.chars.get(characterKey)?.equippedArtifacts ?? {} as StrictDict<SlotKey, string>
-    let curEquip: QueryBuild = Object.assign({}, ...allSlotKeys.map(slotKey => {
-      const art = database.arts.get(equippedArts[slotKey] ?? "")
-      if (!art) return { [slotKey]: undefined }
-      return { [slotKey]: toQueryArtifact(art) }
-    }))
     let qaLookup: Dict<string, QueryArtifact> = {};
     queryArts.forEach(art => qaLookup[art.id] = art)
 
@@ -166,7 +206,7 @@ export default function TabUpopt() {
     upOpt = upgradeOptExpandSink(upOpt, 0, 5)
     setArtifactUpgradeOpts(upOpt);
     console.log('result', upOpt)
-  }, [show20, check4th, useMainStatFilter, characterKey, buildSetting, data, database, setArtifactUpgradeOpts, setpageIdex, upgradeOptExpandSink])
+  }, [show20, check4th, useFilters, characterKey, buildSetting, data, database, setArtifactUpgradeOpts, setpageIdex, upgradeOptExpandSink])
 
   const dataContext: dataContextObj | undefined = useMemo(() => {
     return character && data && characterSheet && teamData && {
@@ -210,11 +250,21 @@ export default function TabUpopt() {
                   <StatFilterCard disabled={false} />
                 </CardContent>
               </CardLight>
-              {useMainStatFilter && <CardLight>
+              {useFilters && <CardLight>
+                <CardContent sx={{ py: 1 }}>
+                  Artifact Level Filter
+                </CardContent>
+                <ArtifactLevelSlider levelLow={levelLow} levelHigh={levelHigh}
+                  setLow={levelLow => buildSettingDispatch({ levelLow })}
+                  setHigh={levelHigh => buildSettingDispatch({ levelHigh })}
+                  setBoth={(levelLow, levelHigh) => buildSettingDispatch({ levelLow, levelHigh })}
+                  disabled={false}
+                />
                 <CardContent>
                   <MainStatSelectionCard disabled={false} />
                 </CardContent>
-              </CardLight>}
+              </CardLight>
+              }
             </Grid>
             <Grid item lg={8} display="flex" flexDirection="column" gap={1}>
               <CardLight>
@@ -227,7 +277,7 @@ export default function TabUpopt() {
                   <Grid container spacing={1}>
                     <Grid item><Button startIcon={show20 ? <CheckBox /> : <CheckBoxOutlineBlank />} color={show20 ? 'success' : 'secondary'} onClick={() => setShow20(!show20)}>show lvl 20</Button></Grid>
                     <Grid item><Button startIcon={check4th ? <CheckBox /> : <CheckBoxOutlineBlank />} color={check4th ? 'success' : 'secondary'} onClick={() => setCheck4th(!check4th)}>compute 4th sub</Button></Grid>
-                    <Grid item><Button startIcon={useMainStatFilter ? <CheckBox /> : <CheckBoxOutlineBlank />} color={useMainStatFilter ? 'success' : 'secondary'} onClick={() => setUseMainStatFilter(!useMainStatFilter)}>filter main stats</Button></Grid>
+                    <Grid item><Button startIcon={useFilters ? <CheckBox /> : <CheckBoxOutlineBlank />} color={useFilters ? 'success' : 'secondary'} onClick={() => setUseMainStatFilter(!useFilters)}>enable filters</Button></Grid>
                   </Grid>
                 </CardContent>
               </CardLight>
