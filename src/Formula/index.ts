@@ -2,7 +2,7 @@ import { allEleEnemyResKeys } from "../KeyMap"
 import { allArtifactSets, allElementsWithPhy, allRegions, allSlotKeys } from "../Types/consts"
 import { crawlObject, deepClone, objectKeyMap, objectKeyValueMap } from "../Util/Util"
 import { Data, Info, NumNode, ReadNode, StrNode } from "./type"
-import { constant, equalStr, frac, infoMut, lookup, max, min, naught, one, percent, prod, read, res, setReadNodeKeys, stringRead, sum, todo } from "./utils"
+import { constant, equalStr, frac, lookup, max, min, naught, one, percent, prod, read, res, setReadNodeKeys, stringRead, sum, todo } from "./utils"
 
 const asConst = true as const, pivot = true as const
 
@@ -20,7 +20,7 @@ const allMisc = [
 const allModStats = [
   ...allArtModStats,
   ...(["all", "burning", ...allTransformative, ...allAmplifying, ...allMoves] as const).map(x => `${x}_dmg_` as const),
-]
+] as const
 const allNonModStats = [
   ...allElements.flatMap(x => [
     `${x}_dmgInc` as const,
@@ -34,7 +34,11 @@ const allNonModStats = [
   ...allEleEnemyResKeys,
   "enemyDefRed_" as const,
   ...allMisc,
-]
+] as const
+
+export const allInputPremodKeys = [...allModStats, ...allNonModStats] as const
+
+export type InputPremodKey = typeof allInputPremodKeys[number]
 
 const talent = objectKeyMap(allTalents, _ => read())
 const allModStatNodes = objectKeyMap(allModStats, key => read(undefined, { key }))
@@ -106,7 +110,7 @@ const input = setReadNodeKeys(deepClone({
     ...objectKeyMap(allElements.map(ele => `${ele}_resMulti` as const), _ => read()),
 
     level: read(undefined, { key: "enemyLevel" }),
-    ...objectKeyValueMap(allElements, ele => [`${ele}_res_`, read(undefined)]),
+    ...objectKeyValueMap(allElements, ele => [`${ele}_res_`, read(undefined, { prefix: "base", key: `${ele}_enemyRes_`, variant: ele })]),
     defRed: read(undefined),
     defIgn: read("add", { key: "enemyDefIgn_", pivot }),
   },
@@ -149,7 +153,15 @@ export const effectiveReaction = lookup(hit.ele, {
 const common: Data = {
   premod: {
     ...objectKeyMap(allTalents, talent => bonus[talent]),
-    ...objectKeyMap(allNonModStats, key => customBonus[key]),
+    ...objectKeyMap(allNonModStats, key => {
+      const operands: NumNode[] = []
+
+      if (key.endsWith('_enemyRes_'))
+        operands.push(enemy[key.replace(/_enemyRes_$/, "_res_")])
+
+      const list = [...operands, customBonus[key]].filter(x => x)
+      return list.length === 1 ? list[0] : sum(...list)
+    }),
     ...objectKeyMap(allModStats, key => {
       const operands: NumNode[] = []
       switch (key) {
@@ -169,7 +181,8 @@ const common: Data = {
           operands.push(percent(1, { key, prefix: "default" }))
           break
       }
-      return sum(...[...operands, art[key], customBonus[key]].filter(x => x))
+      const list = [...operands, art[key], customBonus[key]].filter(x => x)
+      return list.length === 1 ? list[0] : sum(...list)
     }),
   },
   total: {
@@ -221,8 +234,7 @@ const common: Data = {
     // TODO: shred cap of 90%
     def: frac(sum(input.lvl, 100), prod(sum(enemy.level, 100), sum(one, prod(-1, enemy.defRed)), sum(one, prod(-1, enemy.defIgn)))),
     defRed: total.enemyDefRed_,
-    ...objectKeyValueMap(allElements, ele =>
-      [`${ele}_resMulti`, res(infoMut(sum(enemy[`${ele}_res_`], total[`${ele}_enemyRes_`]), { key: `${ele}_res_`, variant: ele }))]),
+    ...objectKeyValueMap(allElements, ele => [`${ele}_resMulti`, res(total[`${ele}_enemyRes_`])]),
   },
 }
 
