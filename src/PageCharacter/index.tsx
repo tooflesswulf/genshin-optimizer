@@ -1,8 +1,8 @@
 import { faPlus } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { Calculate, Checkroom, DeleteForever, FactCheck, Groups } from '@mui/icons-material';
+import { DeleteForever, FactCheck, Groups, TrendingUp } from '@mui/icons-material';
 import { Box, Button, CardContent, Divider, Grid, IconButton, Pagination, Skeleton, TextField, Typography } from '@mui/material';
-import React, { ChangeEvent, Suspense, useCallback, useContext, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { ChangeEvent, Suspense, useCallback, useContext, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import ReactGA from 'react-ga4';
 import { Trans, useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -183,11 +183,6 @@ export default function PageCharacter() {
                     <FactCheck />
                   </IconButton>
                 </BootstrapTooltip>
-                <BootstrapTooltip placement="top" title={<Typography>{t("tabs.equip")}</Typography>}>
-                  <IconButton onClick={() => navigate(`${charKey}/equip`)} >
-                    <Checkroom />
-                  </IconButton>
-                </BootstrapTooltip>
                 <BootstrapTooltip placement="top" title={<Typography>{t("tabs.teambuffs")}</Typography>}>
                   <IconButton onClick={() => navigate(`${charKey}/teambuffs`)} >
                     <Groups />
@@ -195,7 +190,7 @@ export default function PageCharacter() {
                 </BootstrapTooltip>
                 <BootstrapTooltip placement="top" title={<Typography>{t("tabs.optimize")}</Typography>}>
                   <IconButton onClick={() => navigate(`${charKey}/optimize`)} >
-                    <Calculate />
+                    <TrendingUp />
                   </IconButton>
                 </BootstrapTooltip>
                 <Divider orientation="vertical" />

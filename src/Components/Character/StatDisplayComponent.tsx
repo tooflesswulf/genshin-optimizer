@@ -1,23 +1,26 @@
 import { Masonry } from "@mui/lab"
-import { CardContent, CardHeader, Divider, ListItem } from "@mui/material"
+import { Divider, ListItem } from "@mui/material"
 import { Box } from "@mui/system"
 import { useContext, useMemo } from "react"
-import CardDark from "../Card/CardDark"
-import { FieldDisplayList, NodeFieldDisplay } from "../FieldDisplay"
-import ImgIcon from "../Image/ImgIcon"
 import { DataContext } from "../../Context/DataContext"
+import { OptimizationTargetContext } from "../../Context/OptimizationTargetContext"
 import { getDisplayHeader, getDisplaySections } from "../../Formula/DisplayUtil"
 import { DisplaySub } from "../../Formula/type"
 import { NodeDisplay } from "../../Formula/uiData"
 import { customRead } from "../../Formula/utils"
 import usePromise from "../../ReactHooks/usePromise"
 import { objectMap } from "../../Util/Util"
-import { OptimizationTargetContext } from "../../Context/OptimizationTargetContext"
+import CardDark from "../Card/CardDark"
+import CardHeaderCustom from "../Card/CardHeaderCustom"
+import { FieldDisplayList, NodeFieldDisplay } from "../FieldDisplay"
+import ImgIcon from "../Image/ImgIcon"
 import SqBadge from "../SqBadge"
 
 export default function StatDisplayComponent() {
   const { data } = useContext(DataContext)
-  const sections = getDisplaySections(data)
+  const sections = useMemo(() =>
+    getDisplaySections(data).filter(([, ns]) => Object.values(ns).some(n => !n.isEmpty)),
+    [data])
   return <Box sx={{ mr: -1, mb: -1 }}>
     <Masonry columns={{ xs: 1, sm: 2, md: 3, xl: 4 }} spacing={1}>
       {sections.map(([key, Nodes]) =>
@@ -35,15 +38,13 @@ function Section({ displayNs, sectionKey }: { displayNs: DisplaySub<NodeDisplay>
 
   const { title, icon, action } = header
   return <CardDark >
-    <CardHeader avatar={icon && <ImgIcon size={2} sx={{ m: -1 }} src={icon} />} title={title} action={action && <SqBadge>{action}</SqBadge>} titleTypographyProps={{ variant: "subtitle1" }} />
+    <CardHeaderCustom avatar={icon && <ImgIcon size={2} sx={{ m: -1 }} src={icon} />} title={title} action={action && <SqBadge>{action}</SqBadge>} />
     <Divider />
-    <CardContent sx={{ p: 0, "&:last-child": { pb: 0 } }}>
-      <FieldDisplayList sx={{ m: 0 }}>
-        {Object.entries(displayNs).map(([nodeKey, n]) =>
-          <NodeFieldDisplay key={nodeKey} node={n} oldValue={oldData ? oldData.get(displayNsReads[nodeKey]!).value : undefined} component={ListItem}
-            emphasize={JSON.stringify(optimizationTarget) === JSON.stringify([sectionKey, nodeKey])}
-          />)}
-      </FieldDisplayList>
-    </CardContent>
+    <FieldDisplayList sx={{ m: 0 }}>
+      {Object.entries(displayNs).map(([nodeKey, n]) =>
+        <NodeFieldDisplay key={nodeKey} node={n} oldValue={oldData ? oldData.get(displayNsReads[nodeKey]!).value : undefined} component={ListItem}
+          emphasize={JSON.stringify(optimizationTarget) === JSON.stringify([sectionKey, nodeKey])}
+        />)}
+    </FieldDisplayList>
   </CardDark>
 }
