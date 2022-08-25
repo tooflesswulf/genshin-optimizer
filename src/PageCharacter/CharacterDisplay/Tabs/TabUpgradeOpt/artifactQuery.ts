@@ -89,7 +89,7 @@ export function evalArtifact(objective: Query, art: QueryArtifact, slow = false,
   newBuild[art.slot] = art
   let newStats = toStats(newBuild)
   const statsBase = { ...newStats }
-  let scale = (key: SubstatKey) => key.endsWith('_') ? Artifact.maxSubstatValues(key, art.rarity) / 1000 : Artifact.maxSubstatValues(key, art.rarity) / 10
+  let scale = (key: SubstatKey) => key.endsWith('_') ? Artifact.substatValue(key, art.rarity) / 1000 : Artifact.substatValue(key, art.rarity) / 10
 
   const rollsLeft = Artifact.rollsRemaining(art.level, art.rarity) - (4 - art.subs.length)
   if (art.subs.length === 4) calc4th = false

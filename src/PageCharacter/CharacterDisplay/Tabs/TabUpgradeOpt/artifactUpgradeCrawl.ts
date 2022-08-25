@@ -51,7 +51,7 @@ export function crawlUpgrades(n: number, fn?: (n1234: number[], p: number) => vo
 
 export function allUpgradeValues({ statsBase, rollsLeft, subs, skippableDerivs, fourthsubOpts, evalFn }: QueryResult) {
   // TODO: Include non-5* artifacts
-  let scale = (key: SubstatKey) => key.endsWith('_') ? Artifact.maxSubstatValues(key, 5) / 1000 : Artifact.maxSubstatValues(key, 5) / 10
+  let scale = (key: SubstatKey) => key.endsWith('_') ? Artifact.substatValue(key, 5) / 1000 : Artifact.substatValue(key, 5) / 10
   const base = statsBase
 
   let results: WeightedPoint[] = []
