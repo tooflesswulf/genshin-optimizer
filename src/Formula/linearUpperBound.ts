@@ -137,7 +137,7 @@ export function toLinearUpperBound({ nodes, terms }: ExpandedPolynomial, lower: 
 
           // rescale `rop` to be above thresh, since max(f, 0) is a convex function
           const m = (maxVal - thresh) / (maxVal - minVal)
-          const b = thresh - minVal
+          const b = maxVal - minVal
           return sumM(constantM(b), prodM(constantM(m), toPureRead(rop)))
         }
         console.log(n)
