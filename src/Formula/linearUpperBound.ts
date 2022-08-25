@@ -114,8 +114,12 @@ export function toLinearUpperBound({ nodes, terms }: ExpandedPolynomial, lower: 
 
           const slope = (ge.value - lt.value) / (bval.value - lower[key])
           const mon1 = prodM(constantM(slope), readM(stat2tag[branch.path[1]]!))
-          if (lt.value === 0) return mon1
-          return sumM(constantM(lt.value), mon1)
+
+          const intercept = lt.value - slope * lower[key]
+          if (intercept === 0) return mon1
+          return sumM(constantM(intercept), mon1)
+          // if (lt.value === 0) return mon1
+          // return sumM(constantM(lt.value), mon1)
         }
         console.log(n)
         throw Error('Not Implemented (threshold must branch between constants)')
