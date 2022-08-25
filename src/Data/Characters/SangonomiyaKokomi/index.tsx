@@ -85,13 +85,13 @@ const burstNormalDmgInc = equal(condBurst, "on", prod(
     subscript(input.total.burstIndex, datamine.burst.nBonus_, { key: '_' }),
     greaterEq(input.asc, 4, prod(percent(datamine.p2.heal_ratio_), input.premod.heal_)),
   ),
-  input.premod.hp))
+  input.premod.hp), { variant: "invalid" })
 const burstChargedDmgInc = equal(condBurst, "on", prod(
   sum(
     subscript(input.total.burstIndex, datamine.burst.cBonus_, { key: '_' }),
     greaterEq(input.asc, 4, prod(percent(datamine.p2.heal_ratio_), input.premod.heal_)),
   ),
-  input.premod.hp))
+  input.premod.hp), { variant: "invalid" })
 const burstSkillDmgInc = equal(condBurst, "on", prod(
   subscript(input.total.burstIndex, datamine.burst.sBonus_, { key: '_' }),
   input.premod.hp))
@@ -201,7 +201,7 @@ const sheet: ICharacterSheet = {
 
       skill: ct.talentTemplate("skill", [{
         fields: [{
-          node: infoMut(dmgFormulas.skill.heal, { key: `char_${key}_gen:skill.skillParams.0`, variant: "success" }),
+          node: infoMut(dmgFormulas.skill.heal, { key: `char_${key}_gen:skill.skillParams.0` }),
         }, {
           node: infoMut(dmgFormulas.skill.dmg, { key: `char_${key}_gen:skill.skillParams.1` }),
         }, {
@@ -239,7 +239,7 @@ const sheet: ICharacterSheet = {
             }, {
               node: burstSkillDmgInc,
             }, {
-              node: infoMut(dmgFormulas.burst.heal, { key: `char_${key}_gen:burst.skillParams.4`, variant: "success" }),
+              node: infoMut(dmgFormulas.burst.heal, { key: `char_${key}_gen:burst.skillParams.4`, variant: "heal" }),
             }, {
               text: tr("burst.skillParams.5"),
               value: datamine.burst.duration,

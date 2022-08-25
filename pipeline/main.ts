@@ -129,6 +129,7 @@ const characterSkillParamDump = Object.fromEntries(Object.entries(avatarExcelCon
     genTalentHash([...keys, "anemo"], skillDepot[704])
     genTalentHash([...keys, "geo"], skillDepot[706])
     genTalentHash([...keys, "electro"], skillDepot[707])
+    genTalentHash([...keys, "dendro"], skillDepot[708])
   } else {
     genTalentHash(keys, skillDepot[skillDepotId])
   }
@@ -269,7 +270,8 @@ Object.entries(avatarExcelConfigData).filter(([charid,]) => charid in characterI
   layeredAssignment(mapHashData, [...keys, "title"], avatarTitleTextMapHash)
   layeredAssignment(mapHashData, [...keys, "description"], descTextMapHash)
   // layeredAssignment(mapHashData, [...keys, "descriptionDetail"], avatarDetailTextMapHash)
-  layeredAssignment(mapHashData, [...keys, "constellationName"], avatarConstellationBeforTextMapHash)
+  // Don't override constellation name if manually specified. For Zhongli
+  !mapHashData.char[characterIdMap[charid]].constellationName && layeredAssignment(mapHashData, [...keys, "constellationName"], avatarConstellationBeforTextMapHash)
   function genTalentHash(keys: string[], depot: AvatarSkillDepotExcelConfigData) {
     const { energySkill: burst, skills: [normal, skill, sprint], talents, inherentProudSkillOpens: [passive1, passive2, passive3, , passive] } = depot
     layeredAssignment(mapHashData, [...keys, "auto", "name"], [talentsData[normal].nameTextMapHash, "autoName"])
@@ -316,6 +318,7 @@ Object.entries(avatarExcelConfigData).filter(([charid,]) => charid in characterI
     genTalentHash([...keys, "anemo"], skillDepot[704])
     genTalentHash([...keys, "geo"], skillDepot[706])
     genTalentHash([...keys, "electro"], skillDepot[707])
+    genTalentHash([...keys, "dendro"], skillDepot[708])
   } else {
     genTalentHash(keys, skillDepot[skillDepotId])
   }

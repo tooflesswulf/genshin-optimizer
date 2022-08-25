@@ -1,11 +1,12 @@
 import { Add, ContentCopy, DeleteForever, ExpandLess, ExpandMore, Settings } from "@mui/icons-material";
-import { Accordion, AccordionDetails, AccordionSummary, Box, Button, CardContent, Chip, Grid, MenuItem, Skeleton, Tooltip, Typography } from "@mui/material";
+import { Accordion, AccordionDetails, AccordionSummary, Box, Button, ButtonGroup, CardContent, Chip, Grid, MenuItem, Skeleton, Tooltip, Typography } from "@mui/material";
 import { Suspense, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import AdditiveReactionModeText from "../Components/AdditiveReactionModeText";
 import AmpReactionModeText from "../Components/AmpReactionModeText";
 import CardDark from "../Components/Card/CardDark";
 import CloseButton from "../Components/CloseButton";
-import CustomNumberInput, { StyledInputBase } from "../Components/CustomNumberInput";
+import CustomNumberInput, { CustomNumberInputButtonGroupWrapper, StyledInputBase } from "../Components/CustomNumberInput";
 import DropdownButton from "../Components/DropdownMenu/DropdownButton";
 import { infusionVals } from "../Components/HitModeEditor";
 import ModalWrapper from "../Components/ModalWrapper";
@@ -16,8 +17,8 @@ import { allInputPremodKeys, InputPremodKey } from "../Formula";
 import { NodeDisplay, UIData } from "../Formula/uiData";
 import useBoolState from "../ReactHooks/useBoolState";
 import { CustomMultiTarget, CustomTarget } from "../Types/character";
-import { allAmpReactions, allHitModes, allInfusionAuraElements, AmpReactionKey, HitModeKey } from "../Types/consts";
-import { objPathValue } from "../Util/Util";
+import { AdditiveReactionKey, allAdditiveReactions, allAmpReactions, allHitModes, allInfusionAuraElements, allowedAdditiveReactions, allowedAmpReactions, AmpReactionKey, HitModeKey, InfusionAuraElements } from "../Types/consts";
+import { arrayMove, deepClone, objPathValue } from "../Util/Util";
 import OptimizationTargetSelector from "./CharacterDisplay/Tabs/TabOptimize/Components/OptimizationTargetSelector";
 import { TargetSelectorModal } from "./CharacterDisplay/Tabs/TabOptimize/Components/TargetSelectorModal";
 
@@ -42,7 +43,7 @@ function validateOptTarget(path: string[]): string[] {
 function validateCustomTarget(ct: any): CustomTarget | undefined {
   let { weight, path, hitMode, reaction, infusionAura, bonusStats } = ct
 
-  if (typeof weight !== "number")
+  if (typeof weight !== "number" || weight <= 0)
     weight = 1
 
   if (!Array.isArray(path) || path[0] === "custom")
@@ -53,7 +54,7 @@ function validateCustomTarget(ct: any): CustomTarget | undefined {
   if (!hitMode || typeof hitMode !== "string" || !allHitModes.includes(hitMode as HitModeKey))
     hitMode = "avgHit"
 
-  if (reaction && !allAmpReactions.includes(reaction))
+  if (reaction && !allAmpReactions.includes(reaction) && !allAdditiveReactions.includes(reaction))
     reaction = undefined
 
   if (infusionAura && !allInfusionAuraElements.includes(infusionAura))
@@ -176,8 +177,23 @@ function CustomMultiTargetDisplay({ index, target, setTarget, expanded, onExpand
   }, [target, setTarget])
 
   const deleteCustomTarget = useCallback((index: number) => {
+    if (Object.values(target.targets[index].bonusStats).length && !window.confirm(`Are you sure you want to delete this target?`)) return
     const targets = [...target.targets]
     targets.splice(index, 1)
+    setTarget({ ...target, targets })
+  }, [target, setTarget])
+
+  const setTargetIndex = useCallback((oldInd: number) => (newRank?: number) => {
+    if (newRank === undefined || newRank === 0) return
+    const newInd = newRank - 1
+    const targets = [...target.targets]
+    arrayMove(targets, oldInd, newInd)
+    setTarget({ ...target, targets })
+  }, [target, setTarget])
+
+  const dupCustomTarget = useCallback((index: number) => () => {
+    const targets = [...target.targets]
+    targets.splice(index, 0, deepClone(targets[index]));
     setTarget({ ...target, targets })
   }, [target, setTarget])
 
@@ -202,7 +218,7 @@ function CustomMultiTargetDisplay({ index, target, setTarget, expanded, onExpand
         < StyledInputBase value={target.name} sx={{ borderRadius: 1, px: 1, flexGrow: 1 }} onChange={setName} />
         <Chip color={target.targets.length ? "success" : undefined} label={`${target.targets.length} Targets`}></Chip>
         <Tooltip title="Duplicate" placement="top" >
-          <Button onClick={onDup}><ContentCopy /></Button>
+          <Button onClick={onDup} color="info"><ContentCopy /></Button>
         </Tooltip>
         <Button color="error" onClick={onDelete} ><DeleteForever /></Button>
       </Box>
@@ -212,7 +228,7 @@ function CustomMultiTargetDisplay({ index, target, setTarget, expanded, onExpand
         <CopyArea customMultiTarget={target} setCustomMultiTarget={setTarget} />
       </Box> */}
       <Box display="flex" gap={1} flexDirection="column">
-        {target.targets.map((t, i) => <CustomTargetDisplay key={i} customTarget={t} setCustomTarget={(ct) => setCustomTarget(i, ct)} deleteCustomTarget={() => deleteCustomTarget(i)} />)}
+        {target.targets.map((t, i) => <CustomTargetDisplay key={t.path.join() + i} customTarget={t} setCustomTarget={(ct) => setCustomTarget(i, ct)} deleteCustomTarget={() => deleteCustomTarget(i)} rank={i + 1} maxRank={target.targets.length} setTargetIndex={setTargetIndex(i)} onDup={dupCustomTarget(i)} />)}
         <AddCustomTargetBtn setTarget={addTarget} />
       </Box>
 
@@ -221,7 +237,7 @@ function CustomMultiTargetDisplay({ index, target, setTarget, expanded, onExpand
 }
 const keys = [...allInputPremodKeys]
 const wrapperFunc = (e: JSX.Element) => <Grid item xs={1}>{e}</Grid>
-function CustomTargetDisplay({ customTarget, setCustomTarget, deleteCustomTarget }: { customTarget: CustomTarget, setCustomTarget: (t: CustomTarget) => void, deleteCustomTarget: () => void }) {
+function CustomTargetDisplay({ customTarget, setCustomTarget, deleteCustomTarget, rank, maxRank, setTargetIndex, onDup }: { customTarget: CustomTarget, setCustomTarget: (t: CustomTarget) => void, deleteCustomTarget: () => void, rank: number, maxRank: number, setTargetIndex: (ind?: number) => void, onDup: () => void }) {
   const { t } = useTranslation("page_character")
   const { characterSheet } = useContext(CharacterContext)
   const { data } = useContext(DataContext)
@@ -230,41 +246,56 @@ function CustomTargetDisplay({ customTarget, setCustomTarget, deleteCustomTarget
   const node: NodeDisplay = objPathValue(data.getDisplay(), path) as any
   const setFilter = useCallback((bonusStats) => setCustomTarget({ ...customTarget, bonusStats }), [customTarget, setCustomTarget])
 
-  const isMeleeNorm = characterSheet?.isMelee() && path[0] === "normal"
-  return <CardDark>
-    <CardContent >
+  const isMeleeAuto = characterSheet?.isMelee() && (path[0] === "normal" || path[0] === "charged" || path[0] === "plunging")
+  return <CardDark sx={{ display: "flex", }} >
+    <Box sx={{ p: 1, flexGrow: 1 }} >
       <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-        <CustomNumberInput float startAdornment="x" value={weight} onChange={setWeight} sx={{ borderRadius: 1, pl: 1 }} inputProps={{ sx: { textAlign: "center", width: "2em" } }} />
-        <OptimizationTargetSelector optimizationTarget={path} setTarget={path => setCustomTarget({ ...customTarget, path })} ignoreGlobal targetSelectorModalProps={{ flatOnly: true, excludeSections: ["basic", "custom"] }} />
+        <CustomNumberInput float startAdornment="x" value={weight} onChange={setWeight} sx={{ borderRadius: 1, pl: 1 }} inputProps={{ sx: { pl: 0.5, width: "2em" }, min: 0 }} />
+        <OptimizationTargetSelector optimizationTarget={path} setTarget={path => setCustomTarget({ ...customTarget, path, reaction: undefined, infusionAura: undefined })} ignoreGlobal targetSelectorModalProps={{ flatOnly: true, excludeSections: ["basic", "custom"] }} />
         <Box sx={{ flexGrow: 1 }} />
-        <ReactionDropdown reaction={reaction} setReactionMode={(rm) => setCustomTarget({ ...customTarget, reaction: rm })} node={node} />
+        <ReactionDropdown reaction={reaction} setReactionMode={(rm) => setCustomTarget({ ...customTarget, reaction: rm })} node={node} infusionAura={infusionAura} />
         <DropdownButton title={t(`hitmode.${hitMode}`)}>
           {allHitModes.map(hm => <MenuItem key={hm} value={hm} disabled={hitMode === hm} onClick={() => setCustomTarget({ ...customTarget, hitMode: hm })} >{t(`hitmode.${hm}`)}</MenuItem>)}
         </DropdownButton>
-        <Button color="error" onClick={deleteCustomTarget} ><DeleteForever /></Button>
       </Box>
-      <Grid container columns={{ xs: 1, md: 2, lg: 3 }} sx={{ pt: 1 }} spacing={1}>
-        {isMeleeNorm && <Grid item xs={1}>
+      <Grid container columns={{ xs: 1, lg: 2 }} sx={{ pt: 1 }} spacing={1}>
+        {isMeleeAuto && <Grid item xs={1}>
           <DropdownButton title={infusionVals[infusionAura ?? ""]} color={infusionAura || "secondary"} disableElevation fullWidth >
             {Object.entries(infusionVals).map(([key, text]) =>
               <MenuItem key={key} sx={key ? { color: `${key}.main` } : undefined}
                 selected={key === infusionAura} disabled={key === infusionAura}
-                onClick={() => setCustomTarget({ ...customTarget, infusionAura: key ? key : undefined })}>{text}</MenuItem>)}
+                onClick={() => setCustomTarget({ ...customTarget, infusionAura: key ? key : undefined, reaction: undefined })}>{text}</MenuItem>)}
           </DropdownButton>
         </Grid>}
         <StatEditorList statKeys={keys} statFilters={bonusStats} setStatFilters={setFilter} wrapperFunc={wrapperFunc} />
       </Grid>
-    </CardContent>
-  </CardDark>
+    </Box>
+    <ButtonGroup orientation="vertical" sx={{ borderTopLeftRadius: 0, "*": { flexGrow: 1 } }}>
+      <CustomNumberInputButtonGroupWrapper>
+        <CustomNumberInput value={rank} onChange={setTargetIndex} sx={{ pl: 2 }} inputProps={{ sx: { width: "1em" }, min: 1, max: maxRank }} />
+      </CustomNumberInputButtonGroupWrapper>
+      <Button size="small" color="info" onClick={onDup} ><ContentCopy /></Button>
+      <Button size="small" color="error" onClick={deleteCustomTarget} ><DeleteForever /></Button>
+    </ButtonGroup>
+  </CardDark >
 }
-function ReactionDropdown({ node, reaction, setReactionMode }: { node: NodeDisplay, reaction?: AmpReactionKey, setReactionMode: (r?: AmpReactionKey) => void }) {
+function ReactionDropdown({ node, reaction, setReactionMode, infusionAura }: { node: NodeDisplay, reaction?: AmpReactionKey | AdditiveReactionKey, setReactionMode: (r?: AmpReactionKey | AdditiveReactionKey) => void, infusionAura?: InfusionAuraElements }) {
   const ele = node.info.variant ?? "physical"
   const { t } = useTranslation("page_character")
-  if (!["pyro", "hydro", "cryo"].includes(ele)) return null
-  return <DropdownButton title={reaction ? <AmpReactionModeText reaction={reaction} /> : t`ampReaction.noReaction`} sx={{ ml: "auto" }}>
+
+  if (!["pyro", "hydro", "cryo", "electro", "dendro"].some(e => e === ele || e === infusionAura)) return null
+  const reactions = [...new Set([...allowedAmpReactions[ele] ?? [], ...allowedAmpReactions[infusionAura ?? ""] ?? [], ...allowedAdditiveReactions[ele] ?? []])]
+  const title = reaction
+    ? (([...allAmpReactions] as string[]).includes(reaction)
+      ? <AmpReactionModeText reaction={reaction as AmpReactionKey} />
+      : <AdditiveReactionModeText reaction={reaction as AdditiveReactionKey} />)
+    : t`noReaction`
+  return <DropdownButton title={title} sx={{ ml: "auto" }}>
     <MenuItem value="" disabled={!reaction} onClick={() => setReactionMode()} >No Reactions</MenuItem >
-    {allAmpReactions.map(rm => <MenuItem key={rm} disabled={reaction === rm} onClick={() => setReactionMode(rm)}>
-      <AmpReactionModeText reaction={rm} />
+    {reactions.map(rm => <MenuItem key={rm} disabled={reaction === rm} onClick={() => setReactionMode(rm)}>
+      {([...allAmpReactions] as string[]).includes(rm)
+        ? <AmpReactionModeText reaction={rm} />
+        : <AdditiveReactionModeText reaction={rm} />}
     </MenuItem >)}
   </DropdownButton>
 }

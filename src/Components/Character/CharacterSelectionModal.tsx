@@ -4,6 +4,7 @@ import { ChangeEvent, Suspense, useContext, useDeferredValue, useEffect, useMemo
 import { useTranslation } from "react-i18next";
 import Assets from "../../Assets/Assets";
 import CharacterSheet from "../../Data/Characters/CharacterSheet";
+import { getLevelString } from "../../Data/LevelData";
 import { DatabaseContext } from "../../Database/Database";
 import { uiInput as input } from "../../Formula";
 import useDBState from "../../ReactHooks/useDBState";
@@ -12,7 +13,7 @@ import usePromise from "../../ReactHooks/usePromise";
 import useTeamData from "../../ReactHooks/useTeamData";
 import { initCharMeta } from "../../stateInit";
 import { ICachedCharacter } from "../../Types/character";
-import { allCharacterKeys, allElements, allWeaponTypeKeys, CharacterKey } from "../../Types/consts";
+import { allCharacterKeys, allElements, allWeaponTypeKeys, Ascension, CharacterKey } from "../../Types/consts";
 import { characterFilterConfigs, characterSortConfigs } from "../../Util/CharacterSort";
 import { filterFunction, sortFunction } from "../../Util/SortByFilters";
 import CardDark from "../Card/CardDark";
@@ -78,14 +79,14 @@ export function CharacterSelectionModal({ show, onHide, onSelect, filter = () =>
   return <ModalWrapper open={show} onClose={onHide} sx={{ "& .MuiContainer-root": { justifyContent: "normal" } }}>
     <CardDark>
       <CardContent sx={{ py: 1 }}>
-        <Grid container spacing={1} >
+        <Grid container spacing={1} flexWrap="nowrap" >
           <Grid item>
             <WeaponToggle sx={{ height: "100%" }} onChange={setweaponFilter} value={weaponFilter} size="small" />
           </Grid>
           <Grid item>
             <ElementToggle sx={{ height: "100%" }} onChange={setelementalFilter} value={elementalFilter} size="small" />
           </Grid>
-          <Grid item>
+          <Grid item flexShrink={2}>
             <TextField
               autoFocus
               value={searchTerm}
@@ -98,8 +99,6 @@ export function CharacterSelectionModal({ show, onHide, onSelect, filter = () =>
               }}
             />
           </Grid>
-
-          <Grid item flexGrow={1} />
 
           <Grid item >
             <SortByButton sx={{ height: "100%" }}
@@ -125,6 +124,7 @@ function CharacterBtn({ onClick, characterKey, characterSheet }: { onClick: () =
   const teamData = useTeamData(characterKey)
   const { target: data } = teamData?.[characterKey] ?? {}
   const rarity = characterSheet.rarity
+  const element = data ? data.get(input.charEle).value : undefined
   const [{ favorite }, setCharMeta] = useDBState(`charMeta_${characterKey}`, initCharMeta)
   return <Suspense fallback={<Skeleton variant="rectangular" height={130} />}><Box>
     {favorite !== undefined && <Box display="flex" position="absolute" alignSelf="start" zIndex={1}>
@@ -138,7 +138,7 @@ function CharacterBtn({ onClick, characterKey, characterSheet }: { onClick: () =
         <Box sx={{ pl: 1 }}>
           <Typography><strong>{characterSheet.name}</strong></Typography>
           {data ? <>
-            <Typography variant="h6" sx={{ display: "flex", gap: 0.5, alignItems: "center" }}> {characterSheet.elementKey && StatIcon[characterSheet.elementKey]} <ImgIcon src={Assets.weaponTypes?.[characterSheet.weaponTypeKey]} />{` `}{CharacterSheet.getLevelString(data.get(input.lvl).value, data.get(input.asc).value)}</Typography>
+            <Typography variant="h6" sx={{ display: "flex", gap: 0.5, alignItems: "center" }}> {element && StatIcon[element]} <ImgIcon src={Assets.weaponTypes?.[characterSheet.weaponTypeKey]} />{` `}{getLevelString(data.get(input.lvl).value, data.get(input.asc).value as Ascension)}</Typography>
             <Typography variant="subtitle2" >
               <SqBadge color="success">{`C${data.get(input.constellation).value}`}</SqBadge>{` `}
               <SqBadge color={data.get(input.bonus.auto).value ? "info" : "secondary"}><strong >{data.get(input.total.auto).value}</strong></SqBadge>{` `}

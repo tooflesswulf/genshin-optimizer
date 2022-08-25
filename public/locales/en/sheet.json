@@ -47,6 +47,7 @@
     "skillOrBurst": "After using Ele. Skill or Ele. Burst"
   },
   "afterSprint": "After Sprint",
+  "afterReaction": "After triggering an Elemental Reaction",
   "increase": {
     "atk": "ATK Increase"
   },
@@ -134,6 +135,10 @@
     "pyro": "Upon triggering a <pyro>Pyro</pyro> Swirl reaction",
     "electro": "Upon triggering an <electro>Electro</electro> Swirl reaction",
     "cryo": "Upon triggering a <cryo>Cryo</cryo> Swirl reaction"
+  },
+  "elementalReaction": {
+    "hydro": "Upon triggering a <hydro>Hydro-related</hydro> Elemental Reaction",
+    "electro": "Upon triggering an <electro>Electro-related</electro> Elemental Reaction"
   },
   "bonusScaling": {
     "skill_": "Ele. Skill Bonus Scaling"

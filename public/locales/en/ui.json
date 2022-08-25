@@ -51,5 +51,7 @@
   "updatedfor": "Updated for {{version}}",
   "delete": "Delete",
   "locked": "Locked",
-  "unlocked": "Unlocked"
+  "unlocked": "Unlocked",
+  "refinement": "Refinement {{value}}",
+  "selectlevel": "Select Level"
 }

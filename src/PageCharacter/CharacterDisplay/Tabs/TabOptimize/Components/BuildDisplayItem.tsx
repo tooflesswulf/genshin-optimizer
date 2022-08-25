@@ -114,15 +114,17 @@ function SetBadges({ currentlyEquipped = false }: { currentlyEquipped: boolean }
 function SetBadge({ setKey, currentlyEquipped = false, slotarr }: { setKey: ArtifactSetKey, currentlyEquipped: boolean, slotarr: ArtifactSlotKey[] }) {
   const artifactSheet = usePromise(() => ArtifactSheet.get(setKey), [])
   if (!artifactSheet) return null
-
+  const numInSet = slotarr.length
+  const setActive = Object.keys(artifactSheet.setEffects).map((setKey) => parseInt(setKey)).filter(setNum => setNum <= numInSet)
   return <Box>
     <BootstrapTooltip placement="top" title={
       <Suspense fallback={<Skeleton variant='rectangular' width={100} height={100} />}>
-        <SetToolTipTitle artifactSheet={artifactSheet} numInSet={slotarr.length} />
+        <SetToolTipTitle artifactSheet={artifactSheet} numInSet={numInSet} />
       </Suspense>
     } disableInteractive >
       <SqBadge color={currentlyEquipped ? "success" : "primary"} ><Typography >
         {slotarr.map(slotKey => artifactSlotIcon(slotKey))} {artifactSheet.name ?? ""}
+        {setActive.map(n => <SqBadge sx={{ ml: 0.5 }} key={n} color="success">{n}</SqBadge>)}
       </Typography></SqBadge>
     </BootstrapTooltip>
   </Box>
@@ -130,7 +132,7 @@ function SetBadge({ setKey, currentlyEquipped = false, slotarr }: { setKey: Arti
 function SetToolTipTitle({ artifactSheet, numInSet }: { artifactSheet: ArtifactSheet, numInSet: number }) {
   const { t } = useTranslation("sheet")
   return <Stack spacing={2} sx={{ p: 1 }}>
-    {Object.keys(artifactSheet.setEffects).map((setKey) => <Box sx={{ opacity: parseInt(setKey) <= numInSet ? 1 : 0.5 }}>
+    {Object.keys(artifactSheet.setEffects).map((setKey) => <Box key={setKey} sx={{ opacity: parseInt(setKey) <= numInSet ? 1 : 0.5 }}>
       <Typography><SqBadge color="success">{t(`${setKey}set`)}</SqBadge></Typography>
       <Typography><Translate ns={`artifact_${artifactSheet.key}_gen`} key18={`setEffects.${setKey}`} /></Typography>
     </Box>

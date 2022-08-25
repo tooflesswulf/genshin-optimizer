@@ -23,6 +23,8 @@ declare module '@mui/material/styles' {
     physical: Palette['primary'];
     vaporize: Palette['primary'];
     melt: Palette['primary'];
+    spread: Palette['primary'];
+    aggravate: Palette['primary'];
     overloaded: Palette['primary'];
     superconduct: Palette['primary'];
     electrocharged: Palette['primary'];
@@ -30,6 +32,10 @@ declare module '@mui/material/styles' {
     swirl: Palette['primary'];
     burning: Palette['primary'];
     crystallize: Palette['primary'];
+    heal: Palette['primary'];
+    bloom: Palette['primary'];
+    burgeon: Palette['primary'];
+    hyperbloom: Palette['primary'];
 
     white: Palette['primary'];
     red: Palette['primary'];
@@ -62,6 +68,8 @@ declare module '@mui/material/styles' {
     physical?: PaletteOptions['primary'];
     vaporize?: PaletteOptions['primary'];
     melt?: PaletteOptions['primary'];
+    spread?: PaletteOptions['primary'];
+    aggravate?: PaletteOptions['primary'];
     overloaded?: PaletteOptions['primary'];
     superconduct?: PaletteOptions['primary'];
     electrocharged?: PaletteOptions['primary'];
@@ -69,6 +77,10 @@ declare module '@mui/material/styles' {
     swirl?: PaletteOptions['primary'];
     burning?: PaletteOptions['primary'];
     crystallize?: PaletteOptions['primary'];
+    heal?: PaletteOptions['primary'];
+    bloom?: PaletteOptions['primary'];
+    burgeon?: PaletteOptions['primary'];
+    hyperbloom?: PaletteOptions['primary'];
 
     white?: PaletteOptions['primary'];
     red?: PaletteOptions['primary'];
@@ -101,6 +113,8 @@ declare module "@mui/material/Button" {
     physical: true;
     vaporize: true;
     melt: true;
+    spread: true;
+    aggravate: true;
     overloaded: true;
     superconduct: true;
     electrocharged: true;
@@ -108,6 +122,10 @@ declare module "@mui/material/Button" {
     swirl: true;
     burning: true;
     crystallize: true;
+    heal: true;
+    bloom: true;
+    burgeon: true;
+    hyperbloom: true;
 
     white: true;
     red: true;
@@ -123,6 +141,29 @@ declare module "@mui/material/Button" {
 
 declare module "@mui/material/Chip" {
   interface ChipPropsColorOverrides {
+    warning: true;
+    roll1: true;
+    roll2: true;
+    roll3: true;
+    roll4: true;
+    roll5: true;
+    roll6: true;
+    geo: true;
+    dendro: true;
+    pyro: true;
+    hydro: true;
+    cryo: true;
+    electro: true;
+    anemo: true;
+    physical: true;
+    vaporize: true;
+    melt: true;
+    spread: true;
+    aggravate: true;
+  }
+}
+declare module "@mui/material/InputBase" {
+  interface InputBasePropsColorOverrides {
     warning: true;
     roll1: true;
     roll2: true;
@@ -224,7 +265,7 @@ export const theme = createTheme({
       name: "geo"
     }),
     dendro: defaultTheme.palette.augmentColor({
-      color: { main: "#b1ea29", },
+      color: { main: "#a5c83b", contrastText: "#fff" },
       name: "dendro"
     }),
     pyro: defaultTheme.palette.augmentColor({
@@ -259,6 +300,14 @@ export const theme = createTheme({
       color: { main: "#ffcb65", },
       name: "melt"
     }),
+    spread: defaultTheme.palette.augmentColor({
+      color: { main: "#3bc8a7", contrastText: "#fff" },
+      name: "spread"
+    }),
+    aggravate: defaultTheme.palette.augmentColor({
+      color: { main: "#3ba0c8", contrastText: "#fff" },
+      name: "aggravate"
+    }),
     overloaded: defaultTheme.palette.augmentColor({
       color: { main: "#ff7e9a", },
       name: "overloaded"
@@ -286,6 +335,22 @@ export const theme = createTheme({
     crystallize: defaultTheme.palette.augmentColor({
       color: { main: "#f8ba4e", },
       name: "crystallize"
+    }),
+    heal: defaultTheme.palette.augmentColor({
+      color: { main: "#c0e86c", },
+      name: "heal"
+    }),
+    bloom: defaultTheme.palette.augmentColor({
+      color: { main: "#47c83b", contrastText: "#fff" },
+      name: "bloom"
+    }),
+    burgeon: defaultTheme.palette.augmentColor({
+      color: { main: "#c8b33b", contrastText: "#fff" },
+      name: "burgeon"
+    }),
+    hyperbloom: defaultTheme.palette.augmentColor({
+      color: { main: "#3b8dc8", contrastText: "#fff" },
+      name: "hyperbloom"
     }),
 
     white: defaultTheme.palette.augmentColor({

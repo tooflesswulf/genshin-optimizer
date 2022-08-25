@@ -172,8 +172,9 @@ export function deepFreeze(obj: any, layers: number = 5) {
     Object.values(Object.freeze(obj)).forEach(o => deepFreeze(o, layers--))
 }
 
-export function floatCompare(a: number, b: number, accuracy: number = 0.00001) {
-  const diff = a - b
-  if (Math.abs(diff) < accuracy) return 0
-  return diff
+export function arrayMove<T>(arr: T[], oldIndex: number, newIndex: number) {
+  if (newIndex < 0 || newIndex >= arr.length) return arr
+  if (oldIndex < 0 || oldIndex >= arr.length) return arr
+  arr.splice(newIndex, 0, arr.splice(oldIndex, 1)[0]);
+  return arr
 }

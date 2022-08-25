@@ -1,24 +1,25 @@
 import { Button, ButtonProps, InputBase, InputProps, styled } from '@mui/material'
-import { useCallback, useEffect, useMemo, useState } from 'react'
-type props = Omit<InputProps, "onChange"> & {
+import { useCallback, useEffect, useState } from 'react'
+export type CustomNumberInputProps = Omit<InputProps, "onChange"> & {
   value?: number | undefined,
   onChange: (newValue: number | undefined) => void,
   disabled?: boolean
   float?: boolean,
   allowEmpty?: boolean,
+  disableNegative?: boolean
 }
 
-export const StyledInputBase = styled(InputBase)(({ theme }) => ({
-  backgroundColor: theme.palette.primary.main,
+export const StyledInputBase = styled(InputBase)(({ theme, color = "primary" }) => ({
+  backgroundColor: theme.palette[color].main,
   transition: "all 0.5s ease",
   "&:hover": {
-    backgroundColor: theme.palette.primary.dark,
+    backgroundColor: theme.palette[color].dark,
   },
   "&.Mui-focused": {
-    backgroundColor: theme.palette.primary.dark,
+    backgroundColor: theme.palette[color].dark,
   },
   "&.Mui-disabled": {
-    backgroundColor: theme.palette.primary.dark,
+    backgroundColor: theme.palette[color].dark,
   },
 }))
 
@@ -37,10 +38,12 @@ export function CustomNumberInputButtonGroupWrapper({ children, disableRipple, d
   return <Wrapper disableRipple disableFocusRipple disableTouchRipple {...props}>{children}</Wrapper>
 }
 
-export default function CustomNumberInput({ value = 0, onChange, disabled = false, float = false, ...props }: props) {
+export default function CustomNumberInput({ value = 0, onChange, disabled = false, float = false, ...props }: CustomNumberInputProps) {
+  const { inputProps = {}, ...restProps } = props
+
   const [number, setNumber] = useState(value)
   const [focused, setFocus] = useState(false)
-  const parseFunc = useMemo(() => float ? parseFloat : parseInt, [float],)
+  const parseFunc = useCallback((val: string) => float ? parseFloat(val) : parseInt(val), [float])
   const onBlur = useCallback(
     () => {
       onChange(number)
@@ -55,18 +58,24 @@ export default function CustomNumberInput({ value = 0, onChange, disabled = fals
     [setFocus],
   )
   useEffect(() => setNumber(value), [value, setNumber]) // update value on value change
-  const onInputChange = useCallback(e => setNumber(parseFunc(e.target.value) || 0), [setNumber, parseFunc],)
+  const onInputChange = useCallback(e => {
+    const newNum = parseFunc(e.target.value) || 0
+    if (inputProps.min !== undefined && newNum < inputProps.min) return
+    if (inputProps.max !== undefined && newNum > inputProps.max) return
+    setNumber(newNum)
+  }, [setNumber, parseFunc, inputProps.min, inputProps.max])
   const onKeyDOwn = useCallback(e => e.key === "Enter" && onBlur(), [onBlur],)
+
   return <StyledInputBase
     value={(focused && !number) ? "" : number}
     aria-label="custom-input"
     type="number"
-    inputProps={{ step: float ? 0.1 : 1 }}
+    inputProps={{ step: float ? 0.1 : 1, ...inputProps }}
     onChange={onInputChange}
     onBlur={onBlur}
     onFocus={onFocus}
     disabled={disabled}
     onKeyDown={onKeyDOwn}
-    {...props}
+    {...restProps}
   />
 }
