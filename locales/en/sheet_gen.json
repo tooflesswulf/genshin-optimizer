@@ -9,7 +9,7 @@
   },
   "charged": {
     "dmg": "Charged Attack DMG",
-    "spinning": "Charged Attack Spinning DMG",
+    "spinning": "Charged Attack Cyclic DMG",
     "final": "Charged Attack Final DMG",
     "stamina": "Charged Attack Stamina Cost",
     "aimed": "Aimed Shot",
@@ -46,13 +46,22 @@
     "pyro": "Pyro",
     "hydro": "Hydro",
     "cryo": "Cryo",
-    "electro": "Electro"
+    "electro": "Electro",
+    "dendro": "Dendro"
   },
   "reaction": {
     "swirl": "Swirl",
     "crystallize": "Crystallize",
     "overloaded": "Overloaded",
     "electrocharged": "Electro-Charged",
-    "Superconduct": "Superconduct"
+    "superconduct": "Superconduct",
+    "vaporize": "Vaporize",
+    "melt": "Melt",
+    "bloom": "Bloom",
+    "burgeon": "Burgeon",
+    "hyperbloom": "Hyperbloom",
+    "quicken": "Quicken",
+    "aggravate": "Aggravate",
+    "spread": "Spread"
   }
 }

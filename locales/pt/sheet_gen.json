@@ -46,13 +46,22 @@
     "pyro": "Pyro",
     "hydro": "Hydro",
     "cryo": "Cryo",
-    "electro": "Electro"
+    "electro": "Electro",
+    "dendro": "Dendro"
   },
   "reaction": {
     "swirl": "Redemoinho",
     "crystallize": "Cristal",
     "overloaded": "Sobrecarregado",
     "electrocharged": "Carregado Eletricamente",
-    "Superconduct": "Supercondutor"
+    "superconduct": "Supercondutor",
+    "vaporize": "Vaporizar",
+    "melt": "Fundir",
+    "bloom": "Bloom",
+    "burgeon": "Germinação",
+    "hyperbloom": "Superflorescimento",
+    "quicken": "Aceleração",
+    "aggravate": "Intensificação",
+    "spread": "Propagação"
   }
 }
