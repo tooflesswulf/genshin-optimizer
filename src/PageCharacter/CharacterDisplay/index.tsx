@@ -1,4 +1,4 @@
-import { BarChart, Calculate, FactCheck, Groups, Person, TrendingUp } from '@mui/icons-material';
+import { BarChart, Calculate, FactCheck, Groups, Person, Science, TrendingUp } from '@mui/icons-material';
 import { Box, Button, CardContent, Skeleton, Tab, Tabs } from '@mui/material';
 import { Suspense, useCallback, useContext, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -26,6 +26,7 @@ import StatModal from './StatModal';
 import TabBuild from './Tabs/TabOptimize';
 import TabOverview from './Tabs/TabOverview';
 import TabTalent from './Tabs/TabTalent';
+import TabTheorycraft from './Tabs/TabTheorycraft';
 import TabTeambuffs from './Tabs/TabTeambuffs';
 import TabUpopt from './Tabs/TabUpgradeOpt';
 import TravelerElementSelect from './TravelerElementSelect';
@@ -116,6 +117,7 @@ function CharacterPanel() {
       <Route path="/teambuffs" element={<TabTeambuffs />} />
       <Route path="/optimize" element={<TabBuild />} />
       <Route path="/upgradeOpt" element={<TabUpopt />} />
+      <Route path="/theorycraft" element={<TabTheorycraft />} />
     </Routes>
   </Suspense>
 }
@@ -137,6 +139,7 @@ function TabNav({ tab }: { tab: string }) {
     <Tab sx={{ minWidth: "20%" }} value="teambuffs" label={t("tabs.teambuffs")} icon={<Groups />} component={RouterLink} to="teambuffs" />
     <Tab sx={{ minWidth: "20%" }} value="optimize" label={t("tabs.optimize")} icon={<TrendingUp />} component={RouterLink} to="optimize" />
     <Tab sx={{ minWidth: "20%" }} value="upgradeOpt" label={t("tabs.upgradeOpt")} icon={<Calculate />} component={RouterLink} to="upgradeOpt" />
+    <Tab sx={{ minWidth: "20%" }} value="theorycraft" label={t("tabs.theorycraft")} icon={<Science />} component={RouterLink} to="theorycraft" />
   </Tabs>
 }
 
