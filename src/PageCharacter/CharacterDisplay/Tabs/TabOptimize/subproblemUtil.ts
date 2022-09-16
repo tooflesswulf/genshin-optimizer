@@ -270,6 +270,10 @@ export function problemSetup(arts: ArtifactsBySlotVec, { optimizationTargetNode,
   }
   const initialReducedProblem = reduceSubProblem(arts, -Infinity, initialProblem)
   console.log(initialReducedProblem)
+
+  const statsBase = Object.fromEntries(arts.keys.map((k, i) => [k, arts.base[i]]))
+  evaluateExpandedPolynomial(opttargetEP, statsBase)
+
   if (initialReducedProblem === undefined)
     return initialProblem
   return initialReducedProblem
@@ -332,4 +336,16 @@ export function statsUpperLowerVecW(a: ArtifactsBySlotVec) {
     }
   })
   return { minw, maxw }
+}
+export function evaluateExpandedPolynomial(poly: ExpandedPolynomial, x: DynStat) {
+  // 1. evaluate each component node
+  const nodeVals = Object.fromEntries(Object.entries(poly.nodes).map(([fk, f]) => {
+    const [compute, mapping, buffer] = precompute([f], n => n.path[1])
+    Object.entries(mapping).forEach(([k, ix]) => buffer[ix] = x[k])
+    compute()
+    return [fk, buffer[0]]
+  }))
+
+  const termVals = poly.terms.map(({ coeff, terms }) => coeff * terms.reduce((v, t) => v * nodeVals[t], 1))
+  console.log('Value of {poly(x)}: ', termVals.reduce((a, b) => a + b))
 }
