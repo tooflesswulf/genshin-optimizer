@@ -198,6 +198,7 @@ export default function TabUpopt() {
     let nodes = [optimizationTargetNode, ...valueFilter.map(x => x.value)]
     nodes = optimize(nodes, workerData, ({ path: [p] }) => p !== "dyn");
     const query = querySetup(nodes, valueFilter.map(x => x.minimum), curEquip, data);
+
     let artUpOpt = queryArts.map(art => evalArtifact(query, art, false, check4th))
     artUpOpt = artUpOpt.sort((a, b) => b.prob * b.upAvg - a.prob * a.upAvg)
 

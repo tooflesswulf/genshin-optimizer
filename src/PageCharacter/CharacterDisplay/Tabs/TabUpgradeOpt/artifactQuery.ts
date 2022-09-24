@@ -7,7 +7,6 @@ import { SlotKey, Rarity, allArtifactSets } from '../../../../Types/consts';
 import Artifact from "../../../../Data/Artifacts/Artifact"
 import { crawlUpgrades } from "./artifactUpgradeCrawl"
 import { gaussianPE, mvnPE_good } from "./mvncdf"
-import { fillBuffer } from "../../../../Formula/addedUtils"
 
 type GaussianMixture = {
   gmm: {
@@ -255,17 +254,14 @@ export function querySetup(formulas: NumNode[], thresholds: number[], curBuild: 
   // Opt loop a couple times to ensure all constants folded?
   let evalOpt = optimize(toEval, data, ({ path: [p] }) => p !== "dyn")
   evalOpt = optimize(evalOpt, data, ({ path: [p] }) => p !== "dyn")
-  const [evalFn, mapping, buffer] = precompute(evalOpt, f => f.path[1])
 
+  const evalFn = precompute(evalOpt, {}, f => f.path[1], 1)
   let stats = toStats(curBuild)
-  fillBuffer(stats, mapping, buffer)
-  const dmg0 = evalFn()[0]
+  const dmg0 = evalFn([{ id: '', values: stats }])[0]
 
   const skippableDerivs = allSubstatKeys.map(sub => formulas.every(f => zero_deriv(f, f => f.path[1], sub)))
   const structuredEval = (stats: DynStat) => {
-    Object.values(mapping).forEach(k => buffer[k] = 0)  // Need to reset buffer before evaluating
-    fillBuffer(stats, mapping, buffer)
-    const out = evalFn()
+    const out = evalFn([{ id: '', values: stats }])
     return formulas.map((_, i) => {
       const ix = i * (1 + allSubstatKeys.length)
       return { v: out[ix], grads: allSubstatKeys.map((sub, si) => out[ix + 1 + si]) }

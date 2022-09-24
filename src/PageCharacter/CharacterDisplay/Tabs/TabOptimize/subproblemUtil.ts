@@ -1,5 +1,5 @@
 import { ArtSetExclusion } from "../../../../Database/Data/BuildsettingData"
-import { fillBuffer, reducePolynomial } from "../../../../Formula/addedUtils"
+import { reducePolynomial } from "../../../../Formula/addedUtils"
 import { ExpandedPolynomial, expandPoly, toNumNode } from "../../../../Formula/expandPoly"
 import { LinearForm, minMaxWeightVec, toLinearUpperBound } from "../../../../Formula/linearUpperBound"
 import { precompute } from "../../../../Formula/optimization"
@@ -121,9 +121,9 @@ export function reduceSubProblem(arts: ArtifactsBySlotVec, threshold: number, su
   nodes = reducePolynomial(nodes, statsMin, statsMax)
 
   // 1. Check for always-feasible constraints.
-  const [compute, mapping, buffer] = precompute(constraints.map(({ value }) => toNumNode(value)), n => n.path[1])
-  fillBuffer(statsMin, mapping, buffer)
-  const result = compute()
+  const compute = precompute(constraints.map(({ value }) => toNumNode(value)), {}, n => n.path[1], 1)
+  const result = compute([{ id: '', values: statsMin }])
+
   const active = mins.map((m, i) => m > result[i])
 
   const newOptTarget = nodes.pop()!
@@ -340,10 +340,8 @@ export function statsUpperLowerVecW(a: ArtifactsBySlotVec) {
 export function evaluateExpandedPolynomial(poly: ExpandedPolynomial, x: DynStat) {
   // 1. evaluate each component node
   const nodeVals = Object.fromEntries(Object.entries(poly.nodes).map(([fk, f]) => {
-    const [compute, mapping, buffer] = precompute([f], n => n.path[1])
-    Object.entries(mapping).forEach(([k, ix]) => buffer[ix] = x[k])
-    compute()
-    return [fk, buffer[0]]
+    const compute = precompute([f], {}, n => n.path[1], 1);
+    return [fk, compute([{ id: '', values: x }])[0]]
   }))
 
   const termVals = poly.terms.map(({ coeff, terms }) => coeff * terms.reduce((v, t) => v * nodeVals[t], 1))

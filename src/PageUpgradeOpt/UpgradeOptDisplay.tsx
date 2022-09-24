@@ -10,10 +10,11 @@ import { useCallback, useContext, useMemo } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import CardDark from '../Components/Card/CardDark';
 import CardLight from '../Components/Card/CardLight';
-import CharacterDropdownButton from './stopBreakingMe';
+// import CharacterDropdownButton from './stopBreakingMe';
 import { DatabaseContext } from '../Database/Database';
 import { CharacterKey } from '../Types/consts';
 import { useNavigate } from "react-router";
+import CharSelectDropdown from '../PageCharacter/CharacterDisplay/CharSelectDropdown';
 
 function HackyGetAroun() {
   const { database } = useContext(DatabaseContext)
@@ -70,7 +71,8 @@ export default function UpgradeOptDisplay() {
       <CardContent sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
         <CardLight>
           <CardContent>
-            <CharacterDropdownButton fullWidth value={characterKey} onChange={selectCharacter} />
+            <CharSelectDropdown />
+            {/* <CharacterDropdownButton fullWidth value={characterKey} onChange={selectCharacter} /> */}
           </CardContent>
         </CardLight>
       </CardContent>

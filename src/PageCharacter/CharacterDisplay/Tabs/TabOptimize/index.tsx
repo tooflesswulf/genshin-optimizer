@@ -6,7 +6,7 @@ import React, { Suspense, useCallback, useContext, useEffect, useMemo, useRef, u
 import { useTranslation } from 'react-i18next';
 import { Link as RouterLink } from 'react-router-dom';
 // eslint-disable-next-line
-import Worker from "worker-loader!./BackgroundWorker";
+
 import ArtifactLevelSlider from '../../../../Components/Artifact/ArtifactLevelSlider';
 import BootstrapTooltip from '../../../../Components/BootstrapTooltip';
 import CardLight from '../../../../Components/Card/CardLight';
@@ -17,6 +17,7 @@ import SolidToggleButtonGroup from '../../../../Components/SolidToggleButtonGrou
 import { CharacterContext } from '../../../../Context/CharacterContext';
 import { DataContext, dataContextObj } from '../../../../Context/DataContext';
 import { thresholdExclusions } from '../../../../Formula/addedUtils';
+import { defThreads, initialTabOptimizeDBState } from '../../../../Database/Data/StateData';
 import { DatabaseContext } from '../../../../Database/Database';
 import { mergeData, uiDataForTeam } from '../../../../Formula/api';
 import { uiInput as input } from '../../../../Formula/index';
@@ -30,9 +31,8 @@ import useCharSelectionCallback from '../../../../ReactHooks/useCharSelectionCal
 import useDBState from '../../../../ReactHooks/useDBState';
 import useForceUpdate from '../../../../ReactHooks/useForceUpdate';
 import useTeamData, { getTeamData } from '../../../../ReactHooks/useTeamData';
-import { initGlobalSettings } from '../../../../stateInit';
 import { ICachedArtifact } from '../../../../Types/artifact';
-import { CharacterKey } from '../../../../Types/consts';
+import { CharacterKey, charKeyToLocCharKey, LocationCharacterKey } from '../../../../Types/consts';
 import { objectKeyValueMap, objPathValue, range } from '../../../../Util/Util';
 import { FinalizeResult, Setup, WorkerCommand, WorkerResult } from './BackgroundWorker';
 import { maxBuildsToShowList } from './Build';
@@ -48,7 +48,6 @@ import OptimizationTargetSelector from './Components/OptimizationTargetSelector'
 import StatFilterCard from './Components/StatFilterCard';
 import UseEquipped from './Components/UseEquipped';
 import UseExcluded from './Components/UseExcluded';
-import { defThreads, useOptimizeDBState } from './DBState';
 import { compactArtifacts, dynamicData } from './foreground';
 import { OptimizationTargetContext } from '../../../../Context/OptimizationTargetContext';
 import { countBuildsU, problemSetup, SubProblem, toArtifactBySlotVec } from './subproblemUtil';
@@ -56,9 +55,8 @@ import CardDark from '../../../../Components/Card/CardDark';
 import useBuildSetting from './useBuildSetting';
 
 export default function TabBuild() {
-  const { t } = useTranslation("page_character")
+  const { t } = useTranslation("page_character_optimize")
   const { character: { key: characterKey, compareData } } = useContext(CharacterContext)
-  const [{ tcMode }] = useDBState("GlobalSettings", initGlobalSettings)
   const { database } = useContext(DatabaseContext)
 
   const [buildStatus, setBuildStatus] = useState({ type: "inactive", tested: 0, failed: 0, skipped: 0, total: 0 } as BuildStatus)
@@ -68,7 +66,7 @@ export default function TabBuild() {
 
   const [artsDirty, setArtsDirty] = useForceUpdate()
 
-  const [{ equipmentPriority, threads = defThreads }, setOptimizeDBState] = useOptimizeDBState()
+  const [{ equipmentPriority, threads = defThreads }, setOptimizeDBState] = useDBState("TabOptimize", initialTabOptimizeDBState)
   const maxWorkers = threads > defThreads ? defThreads : threads
   const setMaxWorkers = useCallback(threads => setOptimizeDBState({ threads }), [setOptimizeDBState],)
 
@@ -105,11 +103,11 @@ export default function TabBuild() {
     const { artSetExclusion, plotBase, statFilters, mainStatKeys, optimizationTarget, mainStatAssumptionLevel, useExcludedArts, useEquippedArts, allowPartial, maxBuildsToShow, levelLow, levelHigh } = buildSetting
     if (!characterKey || !optimizationTarget) return
 
-    let cantTakeList: CharacterKey[] = []
+    let cantTakeList: Set<LocationCharacterKey> = new Set()
     if (useEquippedArts) {
       const index = equipmentPriority.indexOf(characterKey)
-      if (index < 0) cantTakeList = [...equipmentPriority]
-      else cantTakeList = equipmentPriority.slice(0, index)
+      if (index < 0) equipmentPriority.forEach(ek => cantTakeList.add(charKeyToLocCharKey(ek)))
+      else equipmentPriority.slice(0, index).forEach(ek => cantTakeList.add(charKeyToLocCharKey(ek)))
     }
     const filteredArts = database.arts.values.filter(art => {
       if (art.level < levelLow) return false
@@ -118,11 +116,11 @@ export default function TabBuild() {
       if (mainStats?.length && !mainStats.includes(art.mainStatKey)) return false
 
       // If its equipped on the selected character, bypass the check
-      if (art.location === characterKey) return true
+      if (art.location === charKeyToLocCharKey(characterKey)) return true
 
       if (art.exclude && !useExcludedArts) return false
       if (art.location && !useEquippedArts) return false
-      if (art.location && useEquippedArts && cantTakeList.includes(art.location)) return false
+      if (art.location && useEquippedArts && cantTakeList.has(art.location)) return false
       return true
     })
     const split = compactArtifacts(filteredArts, mainStatAssumptionLevel, allowPartial)
@@ -189,10 +187,11 @@ export default function TabBuild() {
     const busyWorkerIDs = new Set<number>()  // Workers with pending work in SplitWorker()
     const workers: Worker[] = []
 
-    const wrap = { buildValues: Array(maxBuildsToShow).fill(0).map(_ => -Infinity) }
+    // const wrap = { buildValues: Array(maxBuildsToShow).fill(0).map(_ => -Infinity) }
+    const wrap = { buildValues: Array(maxBuildsToShow).fill(0).map(_ => ({ src: "", val: -Infinity })) }
 
     function fetchContinueWork(): WorkerCommand {
-      return { command: "split", minCount: minFilterCount, maxIter: maxSplitIters, threshold: wrap.buildValues[maxBuildsToShow - 1] }
+      return { command: "split", minCount: minFilterCount, maxIter: maxSplitIters, threshold: wrap.buildValues[maxBuildsToShow - 1].val }
     }
     function fetchWork(): WorkerCommand | undefined {
       const subproblem = workQueue.shift()
@@ -200,8 +199,8 @@ export default function TabBuild() {
       let numBuild = countBuildsU(subproblem.filters)
       // let numBuild = countBuilds(filterArts(arts, subproblem.filter))
 
-      if (numBuild <= minFilterCount) return { command: 'iterate', threshold: wrap.buildValues[maxBuildsToShow - 1], subproblem }
-      return { command: 'split', threshold: wrap.buildValues[maxBuildsToShow - 1], minCount: minFilterCount, maxIter: maxSplitIters, subproblem }
+      if (numBuild <= minFilterCount) return { command: 'iterate', threshold: wrap.buildValues[maxBuildsToShow - 1].val, subproblem }
+      return { command: 'split', threshold: wrap.buildValues[maxBuildsToShow - 1].val, minCount: minFilterCount, maxIter: maxSplitIters, subproblem }
     }
     function requestShareWork(sender: number): WorkerCommand {
       return { command: 'share', sender }
@@ -210,7 +209,7 @@ export default function TabBuild() {
     status.total = Object.values(arts.values).reduce((prod, arts) => prod * arts.length, 1)
     const finalizedList: Promise<FinalizeResult>[] = []
     for (let i = 0; i < maxWorkers; i++) {
-      const worker = new Worker()
+      const worker = new Worker(new URL('./BackgroundWorker.ts', import.meta.url))
       workers.push(worker)
 
       const setup: Setup = {
@@ -236,8 +235,9 @@ export default function TabBuild() {
             status.failed += data.failed
             status.skipped += data.skipped
             if (data.buildValues) {
-              wrap.buildValues.push(...data.buildValues)
-              wrap.buildValues.sort((a, b) => b - a).splice(maxBuildsToShow)
+              // wrap.buildValues = wrap.buildValues.filter(({ src }) => src !== data.source)
+              wrap.buildValues.push(...data.buildValues.map(val => ({ src: data.source, val })))
+              wrap.buildValues.sort((a, b) => b.val - a.val).splice(maxBuildsToShow)
             }
             return
           case "split":
@@ -363,8 +363,11 @@ export default function TabBuild() {
         <Grid item xs={12} sm={6} lg={3} display="flex" flexDirection="column" gap={1}>
           <CardLight>
             <CardContent  >
-              <Typography gutterBottom>Main Stat</Typography>
-              <BootstrapTooltip placement="top" title={<Typography><strong>Level Assumption</strong> changes mainstat value to be at least a specific level. Does not change substats.</Typography>}>
+              <Typography gutterBottom>{t`mainStat.title`}</Typography>
+              <BootstrapTooltip placement="top" title={<Box>
+                <Typography variant="h6">{t`mainStat.levelAssTooltip.title`}</Typography>
+                <Typography>{t`mainStat.levelAssTooltip.desc`}</Typography>
+              </Box>}>
                 <Box>
                   <AssumeFullLevelToggle mainStatAssumptionLevel={mainStatAssumptionLevel} setmainStatAssumptionLevel={mainStatAssumptionLevel => buildSettingDispatch({ mainStatAssumptionLevel })} disabled={generatingBuilds} />
                 </Box>
@@ -386,10 +389,10 @@ export default function TabBuild() {
           {/* use equipped */}
           <UseEquipped disabled={generatingBuilds} />
 
-          <Button fullWidth startIcon={allowPartial ? <CheckBox /> : <CheckBoxOutlineBlank />} color={allowPartial ? "success" : "secondary"} onClick={() => buildSettingDispatch({ allowPartial: !allowPartial })}>{t`tabOptimize.allowPartial`}</Button>
+          <Button fullWidth startIcon={allowPartial ? <CheckBox /> : <CheckBoxOutlineBlank />} color={allowPartial ? "success" : "secondary"} onClick={() => buildSettingDispatch({ allowPartial: !allowPartial })}>{t`allowPartial`}</Button>
           { /* Level Filter */}
           <CardLight>
-            <CardContent>Artifact Level Filter</CardContent>
+            <CardContent>{t`levelFilter`}</CardContent>
             <ArtifactLevelSlider levelLow={levelLow} levelHigh={levelHigh}
               setLow={levelLow => buildSettingDispatch({ levelLow })}
               setHigh={levelHigh => buildSettingDispatch({ levelHigh })}
@@ -454,9 +457,9 @@ export default function TabBuild() {
       </Grid>
 
       {!!characterKey && <BuildAlert {...{ status: buildStatus, characterName, maxBuildsToShow }} />}
-      {tcMode && <Box >
+      <Box >
         <ChartCard disabled={generatingBuilds} chartData={chartData} plotBase={plotBase} setPlotBase={setPlotBase} />
-      </Box>}
+      </Box>
       <CardLight>
         <CardContent>
           <Box display="flex" alignItems="center" gap={1} mb={1} >

@@ -6,7 +6,7 @@ export default function useDBState<O extends object>(key: string, init: () => O)
   const [state, setState] = useState(() => database.states.getWithInit<O>(key, init))
 
   useEffect(() =>
-    key ? database.states.follow(key, setState as any) : undefined,
+    key ? database.states.follow(key, (k, r, v) => r === "update" && setState(v)) : undefined,
     [key, setState, database])
   useEffect(() => setState(database.states.getWithInit<O>(key, init)), [database, init, key])
   const updateState = useCallback(
@@ -15,8 +15,4 @@ export default function useDBState<O extends object>(key: string, init: () => O)
   )
 
   return [state ?? init(), updateState]
-}
-
-export function dbMetaInit(index: number) {
-  return () => ({ name: `Database ${index}`, lastEdit: 0 })
 }

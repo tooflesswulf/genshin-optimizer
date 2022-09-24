@@ -3,7 +3,6 @@ import { forEachNodes } from "./internal"
 import { constant, sum, prod, cmp } from "./utils"
 import { NumNode, ReadNode } from "./type"
 import { precompute } from "./optimization"
-import { fillBuffer } from "./addedUtils"
 import { DynStat } from "../PageCharacter/CharacterDisplay/Tabs/TabOptimize/common"
 
 export function zero_deriv(funct: NumNode, binding: (readNode: ReadNode<number>) => string, diff: string): boolean {
@@ -45,7 +44,7 @@ export function ddx(f: NumNode, binding: (readNode: ReadNode<number>) => string,
       const db = ddx(b, binding, diff)
       const denom = prod(sum(...f.operands), sum(...f.operands))
       const numerator = sum(prod(b, da), prod(-1, a, db))
-      return { operation: "sum_frac", operands: [numerator, prod(numerator, -1), denom] }
+      return { operation: "sum_frac", operands: [numerator, sum(prod(numerator, -1), denom)] }
 
     case "min": case "max":
       switch (f.operands.length) {
@@ -82,45 +81,45 @@ export function diff_debug() {
   const formula1: NumNode = { "operation": "mul", "operands": [{ "operation": "add", "operands": [{ "operation": "mul", "operands": [{ "operation": "add", "operands": [{ "operation": "mul", "operands": [{ "operation": "add", "operands": [{ "operation": "threshold", "operands": [{ "operation": "read", "operands": [], "path": ["dyn", "TenacityOfTheMillelith"], "accu": "add", "info": { "key": "TenacityOfTheMillelith" }, "type": "number" }, { "operation": "const", 'type': 'number', "operands": [], "value": 2 }, { "operation": "const", 'type': 'number', "operands": [], "value": 0.2, "info": { "key": "_" } }, { "operation": "const", 'type': 'number', "operands": [], "value": 0 }], "info": { "key": "hp_", "source": "TenacityOfTheMillelith" }, "emptyOn": "l" }, { "operation": "read", "operands": [], "path": ["dyn", "hp_"], "info": { "prefix": "art", "asConst": true, "key": "hp_" }, "type": "number", "accu": "add" }, { "operation": "const", 'type': 'number', "operands": [], "value": 1 }] }, { "operation": "const", 'type': 'number', "operands": [], "value": 15552.306844604493 }] }, { "operation": "read", "operands": [], "path": ["dyn", "hp"], "info": { "prefix": "art", "asConst": true, "key": "hp" }, "type": "number", "accu": "add" }] }, { "operation": "const", 'type': 'number', "operands": [], "value": 0.05957 }] }, { "operation": "mul", "operands": [{ "operation": "add", "operands": [{ "operation": "threshold", "operands": [{ "operation": "read", "operands": [], "path": ["dyn", "ShimenawasReminiscence"], "accu": "add", "info": { "key": "ShimenawasReminiscence" }, "type": "number" }, { "operation": "const", 'type': 'number', "operands": [], "value": 2 }, { "operation": "const", 'type': 'number', "operands": [], "value": 0.18, "info": { "key": "_" } }, { "operation": "const", 'type': 'number', "operands": [], "value": 0 }], "info": { "key": "atk_", "source": "ShimenawasReminiscence" }, "emptyOn": "l" }, { "operation": "read", "operands": [], "path": ["dyn", "atk_"], "info": { "prefix": "art", "asConst": true, "key": "atk_" }, "type": "number", "accu": "add" }, { "operation": "const", 'type': 'number', "operands": [], "value": 1 }] }, { "operation": "const", 'type': 'number', "operands": [], "value": 507.727969991803 }] }, { "operation": "read", "operands": [], "path": ["dyn", "atk"], "info": { "prefix": "art", "asConst": true, "key": "atk" }, "type": "number", "accu": "add" }] }, { "operation": "read", "operands": [], "path": ["dyn", "3"], "type": "number", "accu": "add" }, { "operation": "add", "operands": [{ "operation": "mul", "operands": [{ "operation": "read", "operands": [], "path": ["dyn", "0"], "type": "number", "accu": "add" }, { "operation": "read", "operands": [], "path": ["dyn", "1"], "type": "number", "accu": "add" }] }, { "operation": "const", 'type': 'number', "operands": [], "value": 1 }] }, { "operation": "res", "operands": [{ "operation": "read", "operands": [], "path": ["dyn", "2"], "type": "number", "accu": "add" }] }, { "operation": "add", "operands": [{ "operation": "mul", "operands": [{ "operation": "sum_frac", "operands": [{ "operation": "add", "operands": [{ "operation": "threshold", "operands": [{ "operation": "read", "operands": [], "path": ["dyn", "WanderersTroupe"], "accu": "add", "info": { "key": "WanderersTroupe" }, "type": "number" }, { "operation": "const", 'type': 'number', "operands": [], "value": 2 }, { "operation": "const", 'type': 'number', "operands": [], "value": 80 }, { "operation": "const", 'type': 'number', "operands": [], "value": 0 }], "info": { "key": "eleMas", "source": "WanderersTroupe" }, "emptyOn": "l" }, { "operation": "read", "operands": [], "path": ["dyn", "eleMas"], "info": { "prefix": "art", "asConst": true, "key": "eleMas" }, "type": "number", "accu": "add" }] }, { "operation": "const", 'type': 'number', "operands": [], "value": 1400 }] }, { "operation": "const", 'type': 'number', "operands": [], "value": 2.7777777777777777 }] }, { "operation": "threshold", "operands": [{ "operation": "read", "operands": [], "path": ["dyn", "CrimsonWitchOfFlames"], "accu": "add", "info": { "key": "CrimsonWitchOfFlames" }, "type": "number" }, { "operation": "const", 'type': 'number', "operands": [], "value": 4 }, { "operation": "const", 'type': 'number', "operands": [], "value": 0.15, "info": { "key": "_" } }, { "operation": "const", 'type': 'number', "operands": [], "value": 0 }], "info": { "key": "vaporize_dmg_", "variant": "vaporize", "source": "CrimsonWitchOfFlames" }, "emptyOn": "l" }, { "operation": "const", 'type': 'number', "operands": [], "value": 1 }] }, { "operation": "const", 'type': 'number', "operands": [], "value": 1.71495 }] }
   const formula2 = formula1
 
-  var [compute, mapping, buffer] = precompute([formula2], f => f.path[1])
-  fillBuffer(stats, mapping, buffer)
-  var result = compute()[0]
+  const compute = precompute([formula2], {}, f => f.path[1], 1)
+
+  var result = compute([{ id: '', values: stats }])[0]
 
   // Check validity of calculated derivatives
   const eps = 1e-5
   let stat2 = { ...stats }
   stat2['hp_'] = eps + (stat2['hp_'] ?? 0)
-  fillBuffer(stat2, mapping, buffer)
-  var res2 = compute()[0]
+  var res2 = compute([{ id: '', values: stat2 }])[0]
   var dhp_ = ddx(formula2, f => f.path[1], 'hp_')
-  var [c_dhp_, mapping2, buffer2] = precompute([dhp_], f => f.path[1])
-  Object.entries(stats).forEach(([k, v]) => buffer2[mapping2[k] ?? 0] = v)
-  console.log('diff hp_ (numeric/symbolic)', (res2 - result) / eps, c_dhp_()[0])
+  const c_dhp_ = precompute([dhp_], {}, f => f.path[1], 1)
+  console.log('diff hp_ (numeric/symbolic)', (res2 - result) / eps, c_dhp_([{ id: '', values: stats }])[0])
 
   stat2 = { ...stats }
   stat2['hp'] = eps + (stat2['hp'] ?? 0)
-  fillBuffer(stat2, mapping, buffer)
-  res2 = compute()[0]
+  res2 = compute([{ id: '', values: stat2 }])[0]
   var dhp = ddx(formula2, f => f.path[1], 'hp')
-  var [c_dhp, mapping3, buffer3] = precompute([dhp], f => f.path[1])
-  Object.entries(stats).forEach(([k, v]) => buffer3[mapping3[k] ?? 0] = v)
-  console.log('diff hp (numeric/symbolic)', (res2 - result) / eps, c_dhp()[0])
+  const c_dhp = precompute([dhp], {}, f => f.path[1], 1)
+  console.log('diff hp (numeric/symbolic)', (res2 - result) / eps, c_dhp([{ id: '', values: stats }])[0])
 
   stat2 = { ...stats }
   stat2['atk_'] = eps + (stat2['atk_'] ?? 0)
-  fillBuffer(stat2, mapping, buffer)
-  res2 = compute()[0]
+  res2 = compute([{ id: '', values: stat2 }])[0]
   var datk_ = ddx(formula2, f => f.path[1], 'atk_')
-  var [c_datk_, buffer4, mapping4] = precompute([datk_], f => f.path[1])
-  Object.entries(stats).forEach(([k, v]) => buffer4[mapping4[k] ?? 0] = v)
-  console.log('diff atk_ (numeric/symbolic)', (res2 - result) / eps, c_datk_()[0])
+  const c_datk_ = precompute([datk_], {}, f => f.path[1], 1)
+  console.log('diff atk_ (numeric/symbolic)', (res2 - result) / eps, c_datk_([{ id: '', values: stats }])[0])
+
+  stat2 = { ...stats }
+  stat2['atk'] = eps + (stat2['atk'] ?? 0)
+  res2 = compute([{ id: '', values: stat2 }])[0]
+  var datk = ddx(formula2, f => f.path[1], 'atk')
+  const c_datk = precompute([datk], {}, f => f.path[1], 1)
+  console.log('diff atk (numeric/symbolic)', (res2 - result) / eps, c_datk([{ id: '', values: stats }])[0])
+
 
   stat2 = { ...stats }
   stat2['eleMas'] = eps + (stat2['eleMas'] ?? 0)
-  fillBuffer(stat2, mapping, buffer)
-  res2 = compute()[0]
+  res2 = compute([{ id: '', values: stat2 }])[0]
   var deleMas = ddx(formula2, f => f.path[1], 'eleMas')
-  var [c_deleMas, mapping5, buffer5] = precompute([deleMas], f => f.path[1])
-  Object.entries(stats).forEach(([k, v]) => buffer5[mapping5[k] ?? 0] = v)
-  console.log('diff eleMas (numeric/symbolic)', (res2 - result) / eps, c_deleMas()[0])
+  const c_deleMas = precompute([deleMas], {}, f => f.path[1], 1)
+  console.log('diff eleMas (numeric/symbolic)', (res2 - result) / eps, c_deleMas([{ id: '', values: stats }])[0])
 }

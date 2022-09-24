@@ -14,9 +14,9 @@ onmessage = ({ data }: { data: WorkerCommand }) => {
   switch (command) {
     case "setup":
       id = data.id
-      const callback = (interim: InterimResult) => postMessage({ id, ...interim })
-      splitWorker = new SplitWorker(data, callback)
-      computeWorker = new ComputeWorker(data, callback)
+      const splitID = `split${id}`, computeID = `compute${id}`
+      splitWorker = new SplitWorker(data, interim => postMessage({ id, source: splitID, ...interim }))
+      computeWorker = new ComputeWorker(data, interim => postMessage({ id, source: computeID, ...interim }))
       result = { command: "iterate" }
       break
     case "split":
@@ -54,7 +54,7 @@ onmessage = ({ data }: { data: WorkerCommand }) => {
 
 
 export type WorkerCommand = Setup | Split | Iterate | Finalize | Share | Count
-export type WorkerResult = InterimResult | SplitResult | IterateResult | FinalizeResult | ShareResult | CountResult
+export type WorkerResult = SourcedInterimResult | SplitResult | IterateResult | FinalizeResult | ShareResult | CountResult
 
 export interface Setup {
   command: "setup"
@@ -126,4 +126,17 @@ export interface ShareResult {
 export interface CountResult {
   command: "count"
   counts: number[]
+}
+export interface InterimResult {
+  command: "interim"
+  buildValues: number[] | undefined
+  /** The number of builds since last report, including failed builds */
+  tested: number
+  /** The number of builds that does not meet the min-filter requirement since last report */
+  failed: number
+  skipped: number
+}
+export interface SourcedInterimResult extends InterimResult {
+  /** the source of the message, must be unique for each source of `buildValues` */
+  source: string
 }

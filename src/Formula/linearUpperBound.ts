@@ -19,11 +19,9 @@ export type LinearFormVec = {
 }
 
 function minMax(node: NumNode, lower: DynStat, upper: DynStat) {
-  let [compute, mapping, buffer] = precompute([node], n => n.path[1])
-  fillBuffer(lower, mapping, buffer)
-  const minval = compute()[0]
-  fillBuffer(upper, mapping, buffer)
-  const maxval = compute()[0]
+  const compute = precompute([node], {}, n => n.path[1], 1)
+  const minval = compute([{ id: '', values: lower }])[0]
+  const maxval = compute([{ id: '', values: upper }])[0]
   return [minval, maxval]
 }
 

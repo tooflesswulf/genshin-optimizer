@@ -19,7 +19,7 @@ import usePromise from '../ReactHooks/usePromise';
 import { allRarities, allWeaponTypeKeys, WeaponKey } from '../Types/consts';
 import { filterFunction, sortFunction } from '../Util/SortByFilters';
 import { clamp } from '../Util/Util';
-import { weaponFilterConfigs, weaponSortConfigs, weaponSortKeys } from '../Util/WeaponSort';
+import { weaponFilterConfigs, weaponSortConfigs, weaponSortKeys, weaponSortMap } from '../Util/WeaponSort';
 import { initialWeapon } from '../Util/WeaponUtil';
 import WeaponCard from './WeaponCard';
 
@@ -37,6 +37,8 @@ const initialState = () => ({
   weaponType: [...allWeaponTypeKeys],
 })
 
+const sortKeys = Object.keys(weaponSortMap)
+
 export default function PageWeapon() {
   const { t } = useTranslation(["page_weapon", "ui", "weaponNames_gen"])
   const { database } = useContext(DatabaseContext)
@@ -48,7 +50,7 @@ export default function PageWeapon() {
   //set follow, should run only once
   useEffect(() => {
     ReactGA.send({ hitType: "pageview", page: '/weapon' })
-    return database.weapons.followAny(forceUpdate)
+    return database.weapons.followAny((k, r) => (r === "new" || r === "remove") && forceUpdate())
   }, [forceUpdate, database])
 
   const brPt = useMediaQueryUp()
@@ -81,17 +83,16 @@ export default function PageWeapon() {
   const deferredSearchTerm = useDeferredValue(searchTerm)
 
   const { sortType, ascending, weaponType, rarity } = state
-  const sortConfigs = useMemo(() => weaponSheets && weaponSortConfigs(weaponSheets), [weaponSheets])
-  const filterConfigs = useMemo(() => weaponSheets && weaponFilterConfigs(weaponSheets), [weaponSheets])
   const { weaponIdList, totalWeaponNum } = useMemo(() => {
     const weapons = database.weapons.values
     const totalWeaponNum = weapons.length
-    if (!sortConfigs || !filterConfigs) return { weaponIdList: [], totalWeaponNum }
-    const weaponIdList = weapons.filter(filterFunction({ weaponType, rarity, name: deferredSearchTerm }, filterConfigs))
-      .sort(sortFunction(sortType, ascending, sortConfigs))
+    if (!weaponSheets) return { weaponIdList: [], totalWeaponNum }
+    const weaponIdList = weapons
+      .filter(filterFunction({ weaponType, rarity, name: deferredSearchTerm }, weaponFilterConfigs(weaponSheets)))
+      .sort(sortFunction(weaponSortMap[sortType] ?? [], ascending, weaponSortConfigs(weaponSheets)))
       .map(weapon => weapon.id)
     return dbDirty && { weaponIdList, totalWeaponNum }
-  }, [dbDirty, database, sortConfigs, filterConfigs, sortType, ascending, rarity, weaponType, deferredSearchTerm])
+  }, [dbDirty, database, weaponSheets, sortType, ascending, rarity, weaponType, deferredSearchTerm])
 
   const { weaponIdsToShow, numPages, currentPageIndex } = useMemo(() => {
     const numPages = Math.ceil(weaponIdList.length / maxNumToDisplay)
@@ -154,7 +155,7 @@ export default function PageWeapon() {
           />
         </Grid>
         <Grid item>
-          <SortByButton sx={{ height: "100%" }} sortKeys={weaponSortKeys}
+          <SortByButton sx={{ height: "100%" }} sortKeys={sortKeys}
             value={sortType} onChange={sortType => stateDispatch({ sortType })}
             ascending={ascending} onChangeAsc={ascending => stateDispatch({ ascending })}
           />

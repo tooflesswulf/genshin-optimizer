@@ -2,7 +2,7 @@ import { reduceFormula, statsUpperLower } from '../../../../Formula/addedUtils';
 import { optimize, precompute } from '../../../../Formula/optimization';
 import type { NumNode } from '../../../../Formula/type';
 import type { InterimResult, Setup } from './BackgroundWorker';
-import { ArtifactsBySlot, ArtifactsBySlotVec, Build, countBuilds, DynStat, filterArts, filterArts2, mergePlot, PlotData, reaffine, RequestFilter } from './common';
+import { ArtifactBuildData, ArtifactsBySlot, ArtifactsBySlotVec, Build, countBuilds, DynStat, filterArts, filterArts2, mergePlot, PlotData, reaffine, RequestFilter } from './common';
 import { ArtSetExclusionFull, countBuildsU, SubProblem, unionFilterUpperLower } from './subproblemUtil';
 
 function checkArtSetExclusion(setKeyCounts: DynStat, excl: ArtSetExclusionFull) {
@@ -72,25 +72,19 @@ export class ComputeWorker {
     nodes = reaff.nodes
     const preArts = reaff.arts
 
-    const [compute, mapping, buffer] = precompute(nodes, f => f.path[1])
+    // const [compute, mapping, buffer] = precompute(nodes, f => f.path[1])
     const unionArts = filters.map(filter => {
-      const a = filterArts2(reaff.arts, filter.filterVec)
+      const a = filterArts2(preArts, filter.filterVec)
       return Object.values(a.values)
         .sort((a, b) => a.length - b.length)
-        .map(arts => arts.map(art => ({
-          id: art.id, set: art.set,
-          values: Object.entries(art.values)
-            .map(([key, value]) => ({ key: mapping[key]!, value, cache: 0 }))
-            .filter(({ key, value }) => key !== undefined && value !== 0)
-        })))
     })
-
+    const compute = precompute(nodes, preArts.base, f => f.path[1], 5)  // should p much always be 5
+    const buffer = Array<ArtifactBuildData>(5)
     let count = { tested: 0, failed: 0, skipped: 0 }
 
-    let ids: string[] = []
     function permute(i: number, j: number, setKeyCounts: DynStat) {
       if (j < 0) {
-        const result = compute()
+        const result = compute(buffer)
         if (min.some((m, i) => m > result[i]) || !checkArtSetExclusion(setKeyCounts, artSetExclusion)) {
           count.failed++
           return
@@ -99,14 +93,14 @@ export class ComputeWorker {
         const value = result[min.length], { builds, buildValues, plotData, threshold } = self
         let build: Build | undefined
         if (value >= threshold) {
-          build = { value, artifactIds: [...ids] }
+          build = { value, artifactIds: buffer.map(x => x.id) }
           builds.push(build)
           buildValues.push(value)
         }
         if (plotData) {
           const x = result[min.length + 1]
           if (!plotData[x] || plotData[x]!.value < value) {
-            if (!build) build = { value, artifactIds: [...ids] }
+            if (!build) build = { value, artifactIds: buffer.map(x => x.id) }
             build.plot = x
             plotData[x] = build
           }
@@ -115,34 +109,26 @@ export class ComputeWorker {
       }
 
       unionArts[i][j].forEach(art => {
-        ids[j] = art.id
-
-        for (const curr of art.values) {
-          const { key, value } = curr
-          curr.cache = buffer[key]
-          buffer[key] += value
-        }
+        buffer[j] = art
 
         setKeyCounts[art.set ?? ''] = 1 + (setKeyCounts[art.set ?? ''] ?? 0)
         permute(i, j - 1, setKeyCounts)
         setKeyCounts[art.set ?? ''] -= 1
         if (setKeyCounts[art.set ?? ''] === 0) delete setKeyCounts[art.set ?? '']
-
-        for (const { key, cache } of art.values) buffer[key] = cache
       })
 
       if (j === 0) count.tested += unionArts[i][j].length
     }
 
     // 4. Set up buffer with `preArts.base`
-    for (const [key, value] of Object.entries(preArts.base)) {
-      const i = mapping[key]
-      if (i !== undefined) buffer[i] = value
-    }
+    // for (const [key, value] of Object.entries(preArts.base)) {
+    //   const i = mapping[key]
+    //   if (i !== undefined) buffer[i] = value
+    // }
 
     // 5. permute all combinations
     for (let i = 0; i < unionArts.length; i++) {
-      ids = Array(unionArts[0].length).fill("")  // isnt this just Array(5)?
+      buffer.fill({ id: '', values: {} })
       permute(i, unionArts[i].length - 1, {})
     }
 

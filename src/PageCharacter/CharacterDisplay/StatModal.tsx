@@ -1,6 +1,7 @@
 import { CardContent, CardHeader, Grid, ListItem, Stack, Typography } from "@mui/material";
 import { Box } from "@mui/system";
 import { useCallback, useContext, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import CardDark from "../../Components/Card/CardDark";
 import CardLight from "../../Components/Card/CardLight";
 import CloseButton from "../../Components/CloseButton";
@@ -15,16 +16,17 @@ import { DataContext } from "../../Context/DataContext";
 import { allInputPremodKeys, uiInput as input } from "../../Formula";
 import { ReadNode } from "../../Formula/type";
 import KeyMap, { allEleDmgKeys, allEleResKeys, valueString } from "../../KeyMap";
-import { allElements, ElementKey, ElementKeyWithPhy } from "../../Types/consts";
+import { allElements, ElementKeyWithPhy } from "../../Types/consts";
 
 const cols = {
   xs: 1, md: 2, lg: 3
 }
 
 export default function StatModal({ open, onClose }) {
+  const { t } = useTranslation("page_character")
   return <ModalWrapper open={open} onClose={onClose}>
     <CardDark>
-      <CardHeader title="Detailed Stats" action={<CloseButton onClick={onClose} />} />
+      <CardHeader title={t`addStats.title`} action={<CloseButton onClick={onClose} />} />
       <CardContent sx={{ pt: 0 }}>
         <Stack spacing={1}>
           <BonusStatsEditor />
@@ -71,10 +73,10 @@ function StatDisplayContent({ nodes, extra }: { nodes: ReadNode<number>[], extra
 }
 
 function MainStatsCards() {
-  const { character: { elementKey }, characterSheet } = useContext(CharacterContext)
+  const { characterSheet } = useContext(CharacterContext)
   const { data } = useContext(DataContext)
   const specialNode = data.get(input.special)
-  const charEle = (elementKey ?? characterSheet.elementKey) as ElementKey
+  const charEle = characterSheet.elementKey
   const isMelee = characterSheet.isMelee()
 
   const otherStatReadNodes = useMemo(() => {

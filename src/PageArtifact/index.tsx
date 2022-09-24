@@ -14,13 +14,12 @@ import { DatabaseContext } from '../Database/Database';
 import useDBState from '../ReactHooks/useDBState';
 import useForceUpdate from '../ReactHooks/useForceUpdate';
 import useMediaQueryUp from '../ReactHooks/useMediaQueryUp';
-import { initGlobalSettings } from '../stateInit';
 import { allSubstatKeys, SubstatKey } from '../Types/artifact';
 import { filterFunction, sortFunction } from '../Util/SortByFilters';
 import { clamp } from '../Util/Util';
 import ArtifactCard from './ArtifactCard';
 import ArtifactFilter, { ArtifactRedButtons } from './ArtifactFilter';
-import { artifactFilterConfigs, artifactSortConfigs, artifactSortKeys, artifactSortKeysTC, initialArtifactSortFilter } from './ArtifactSort';
+import { artifactFilterConfigs, artifactSortConfigs, artifactSortKeys, artifactSortMap, initialArtifactSortFilter } from './ArtifactSort';
 import ProbabilityFilter from './ProbabilityFilter';
 import { probability } from './RollProbability';
 
@@ -39,25 +38,19 @@ function initialState() {
   }
 }
 export default function PageArtifact() {
-  const [{ tcMode }] = useDBState("GlobalSettings", initGlobalSettings)
   const { t } = useTranslation(["artifact", "ui"]);
   const { database } = useContext(DatabaseContext)
   const [artifactDisplayState, setArtifactDisplayState] = useDBState("ArtifactDisplay", initialState)
-  const stateDispatch = useCallback(
-    action => {
-      if (action.type === "reset") setArtifactDisplayState(initialArtifactSortFilter())
-      else setArtifactDisplayState(action)
-    },
-    [setArtifactDisplayState],
-  )
+  const stateDispatch = useCallback(action => {
+    if (action.type === "reset") setArtifactDisplayState(initialArtifactSortFilter())
+    else setArtifactDisplayState(action)
+  }, [setArtifactDisplayState])
   const brPt = useMediaQueryUp()
   const maxNumArtifactsToDisplay = numToShowMap[brPt]
 
   const { effFilter, filterOption, ascending, probabilityFilter } = artifactDisplayState
   let { sortType } = artifactDisplayState
-  const showProbability = tcMode && sortType === "probability"
-  //force the sortType back to a normal value after exiting TC mode
-  if (sortType === "probability" && !tcMode) stateDispatch({ sortType: artifactSortKeys[0] })
+  const showProbability = sortType === "probability"
 
   const [pageIdex, setpageIdex] = useState(0)
   const invScrollRef = useRef<HTMLDivElement>(null)
@@ -67,7 +60,7 @@ export default function PageArtifact() {
 
   useEffect(() => {
     ReactGA.send({ hitType: "pageview", page: '/artifact' })
-    return database.arts.followAny(forceUpdate)
+    return database.arts.followAny(() => forceUpdate())
   }, [database, forceUpdate])
 
   const filterOptionDispatch = useCallback((action) => {
@@ -83,27 +76,24 @@ export default function PageArtifact() {
 
   const noArtifact = useMemo(() => !database.arts.values.length, [database])
   const sortConfigs = useMemo(() => artifactSortConfigs(effFilterSet, probabilityFilter), [effFilterSet, probabilityFilter])
-  const filterConfigs = useMemo(() => artifactFilterConfigs(), [])
+  const filterConfigs = useMemo(() => artifactFilterConfigs(effFilterSet), [effFilterSet])
   const deferredArtifactDisplayState = useDeferredValue(artifactDisplayState)
   const deferredProbabilityFilter = useDeferredValue(probabilityFilter)
   useEffect(() => {
     if (!showProbability) return
     database.arts.values.forEach(art => database.arts.setProbability(art.id, probability(art, deferredProbabilityFilter)))
-    return () => {
-      database.arts.values.forEach(art => database.arts.setProbability(art.id, -1))
-    }
+    return () => database.arts.values.forEach(art => database.arts.setProbability(art.id, -1))
   }, [database, showProbability, deferredProbabilityFilter])
 
   const { artifactIds, totalArtNum } = useMemo(() => {
     const { sortType = artifactSortKeys[0], ascending = false, filterOption } = deferredArtifactDisplayState
     let allArtifacts = database.arts.values
-    const filterFunc = filterFunction(filterOption, filterConfigs)
-    const sortFunc = sortFunction(sortType, ascending, sortConfigs)
     //in probability mode, filter out the artifacts that already reach criteria
-    if (showProbability) {
-      allArtifacts = allArtifacts.filter(art => art.probability && art.probability !== 1)
-    }
-    const artifactIds = allArtifacts.filter(filterFunc).sort(sortFunc).map(art => art.id)
+    if (showProbability) allArtifacts = allArtifacts.filter(art => art.probability && art.probability !== 1)
+    const artifactIds = allArtifacts
+      .filter(filterFunction(filterOption, filterConfigs))
+      .sort(sortFunction(artifactSortMap[sortType] ?? [], ascending, sortConfigs))
+      .map(art => art.id)
     return { artifactIds, totalArtNum: allArtifacts.length, ...dbDirty }//use dbDirty to shoo away warnings!
   }, [deferredArtifactDisplayState, dbDirty, database, sortConfigs, filterConfigs, showProbability])
 
@@ -137,7 +127,6 @@ export default function PageArtifact() {
 
     <ArtifactFilter filterOption={filterOption} filterOptionDispatch={filterOptionDispatch} filterDispatch={stateDispatch}
       numShowing={artifactIds.length} total={totalArtNum} />
-    {showProbability && <ProbabilityFilter probabilityFilter={probabilityFilter} setProbabilityFilter={setProbabilityFilter} />}
     <CardDark ref={invScrollRef}>
       <CardContent>
         <Grid container sx={{ mb: 1 }}>
@@ -159,7 +148,7 @@ export default function PageArtifact() {
         </Grid>
         <Grid item xs={12} sm={6} md={4} lg={4} xl={3} display="flex">
           <Box flexGrow={1} />
-          <SortByButton sortKeys={[...artifactSortKeys.filter(key => (artifactSortKeysTC as unknown as string[]).includes(key) ? tcMode : true)]}
+          <SortByButton sortKeys={[...artifactSortKeys]}
             value={sortType} onChange={sortType => stateDispatch({ sortType })}
             ascending={ascending} onChangeAsc={ascending => stateDispatch({ ascending })}
           />
@@ -167,7 +156,7 @@ export default function PageArtifact() {
       </Grid>
       <ArtifactRedButtons artifactIds={artifactIds} />
     </CardContent></CardDark>
-
+    {showProbability && <ProbabilityFilter probabilityFilter={probabilityFilter} setProbabilityFilter={setProbabilityFilter} />}
     <Suspense fallback={<Skeleton variant="rectangular" sx={{ width: "100%", height: "100%", minHeight: 5000 }} />}>
       <Grid container spacing={1} columns={columns} >
         <Grid item xs={1} >
