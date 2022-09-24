@@ -1,6 +1,6 @@
 import { assertUnreachable } from "../Util/Util"
 import { forEachNodes } from "./internal"
-import { constant, sum, prod, cmp } from "./utils"
+import { constant, sum, prod, cmp, frac } from "./utils"
 import { NumNode, ReadNode } from "./type"
 import { precompute } from "./optimization"
 import { DynStat } from "../PageCharacter/CharacterDisplay/Tabs/TabOptimize/common"
@@ -44,7 +44,8 @@ export function ddx(f: NumNode, binding: (readNode: ReadNode<number>) => string,
       const db = ddx(b, binding, diff)
       const denom = prod(sum(...f.operands), sum(...f.operands))
       const numerator = sum(prod(b, da), prod(-1, a, db))
-      return { operation: "sum_frac", operands: [numerator, sum(prod(numerator, -1), denom)] }
+      return frac(numerator, sum(prod(-1, numerator), denom))
+      // return { operation: "sum_frac", operands: [numerator, sum(prod(numerator, -1), denom)] }
 
     case "min": case "max":
       switch (f.operands.length) {
