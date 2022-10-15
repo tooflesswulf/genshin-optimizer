@@ -4,9 +4,7 @@ import { CheckBox, CheckBoxOutlineBlank, Close, TrendingUp } from '@mui/icons-ma
 import { Alert, Box, Button, ButtonGroup, CardContent, Divider, Grid, Link, MenuItem, Skeleton, ToggleButton, Typography, Pagination } from '@mui/material';
 import React, { Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link as RouterLink } from 'react-router-dom';
-// eslint-disable-next-line
-
+import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom';
 import ArtifactLevelSlider from '../../../../Components/Artifact/ArtifactLevelSlider';
 import BootstrapTooltip from '../../../../Components/BootstrapTooltip';
 import CardLight from '../../../../Components/Card/CardLight';
@@ -17,8 +15,8 @@ import SolidToggleButtonGroup from '../../../../Components/SolidToggleButtonGrou
 import { CharacterContext } from '../../../../Context/CharacterContext';
 import { DataContext, dataContextObj } from '../../../../Context/DataContext';
 import { thresholdExclusions } from '../../../../Formula/addedUtils';
-import { defThreads, initialTabOptimizeDBState } from '../../../../Database/Data/StateData';
 import { DatabaseContext } from '../../../../Database/Database';
+import { defThreads } from '../../../../Database/DataEntries/DisplayOptimizeEntry';
 import { mergeData, uiDataForTeam } from '../../../../Formula/api';
 import { uiInput as input } from '../../../../Formula/index';
 import { optimize } from '../../../../Formula/optimization';
@@ -28,15 +26,13 @@ import { UIData } from '../../../../Formula/uiData';
 import KeyMap from '../../../../KeyMap';
 import useCharacterReducer from '../../../../ReactHooks/useCharacterReducer';
 import useCharSelectionCallback from '../../../../ReactHooks/useCharSelectionCallback';
-import useDBState from '../../../../ReactHooks/useDBState';
 import useForceUpdate from '../../../../ReactHooks/useForceUpdate';
 import useTeamData, { getTeamData } from '../../../../ReactHooks/useTeamData';
-import { ICachedArtifact } from '../../../../Types/artifact';
 import { CharacterKey, charKeyToLocCharKey, LocationCharacterKey } from '../../../../Types/consts';
 import { objectKeyValueMap, objPathValue, range } from '../../../../Util/Util';
 import { FinalizeResult, Setup, WorkerCommand, WorkerResult } from './BackgroundWorker';
 import { maxBuildsToShowList } from './Build';
-import { artSetPerm, Build, filterFeasiblePerm, mergeBuilds, mergePlot, pruneAll, RequestFilter } from './common';
+import { artSetPerm, Build, filterFeasiblePerm, mergeBuilds, mergePlot, pruneAll, pruneExclusion, RequestFilter } from './common';
 import ArtifactSetConfig from './Components/ArtifactSetConfig';
 import AssumeFullLevelToggle from './Components/AssumeFullLevelToggle';
 import BonusStatsCard from './Components/BonusStatsCard';
@@ -66,9 +62,11 @@ export default function TabBuild() {
 
   const [artsDirty, setArtsDirty] = useForceUpdate()
 
-  const [{ equipmentPriority, threads = defThreads }, setOptimizeDBState] = useDBState("TabOptimize", initialTabOptimizeDBState)
+  const [{ equipmentPriority, threads = defThreads }, setDisplayOptimize] = useState(database.displayOptimize.get())
+  useEffect(() => database.displayOptimize.follow((r, to) => setDisplayOptimize(to)), [database, setDisplayOptimize])
+
   const maxWorkers = threads > defThreads ? defThreads : threads
-  const setMaxWorkers = useCallback(threads => setOptimizeDBState({ threads }), [setOptimizeDBState],)
+  const setMaxWorkers = useCallback(threads => database.displayOptimize.set({ threads }), [database],)
 
   const characterDispatch = useCharacterReducer(characterKey)
   const onClickTeammate = useCharSelectionCallback()
@@ -79,16 +77,6 @@ export default function TabBuild() {
   const { plotBase, optimizationTarget, mainStatAssumptionLevel, allowPartial, builds, buildDate, maxBuildsToShow, levelLow, levelHigh } = buildSetting
   const teamData = useTeamData(characterKey, mainStatAssumptionLevel)
   const { characterSheet, target: data } = teamData?.[characterKey as CharacterKey] ?? {}
-  const buildsArts = useMemo(() => builds.map(build => build.map(i => database.arts.get(i)!)), [builds, database])
-  const numBuilds = buildsArts.length
-
-  const [currentPageIndex, setCurrentPageIndex] = useState(0)
-  const { numPages } = useMemo(() => {
-    return { numPages: Math.ceil(numBuilds / maxArtsToShowPerPage) }
-  }, [numBuilds])
-  const setPageIdx = useCallback((e, value: number) => {
-    setCurrentPageIndex(value - 1)
-  }, [setCurrentPageIndex])
 
   //register changes in artifact database
   useEffect(() =>
@@ -139,11 +127,9 @@ export default function TabBuild() {
     }).filter(x => x.value && x.minimum > -Infinity)
 
     setchartData(undefined)
-
     const cancelled = new Promise<void>(r => cancelToken.current = r)
 
     let nodes = [...valueFilter.map(x => x.value), optimizationTargetNode], arts = split!
-    // const setPerms = filterFeasiblePerm(artSetPerm(artSetExclusion, Object.values(split.values).flatMap(x => x.map(x => x.set!))), split)
 
     const minimum = [...valueFilter.map(x => x.minimum), -Infinity]
     const status: Omit<BuildStatus, "type"> = { tested: 0, failed: 0, skipped: 0, total: NaN, startTime: performance.now() }
@@ -152,11 +138,13 @@ export default function TabBuild() {
       minimum.push(-Infinity)
     }
 
-    nodes = optimize(nodes, workerData, ({ path: [p] }) => p !== "dyn");
+    // BEGIN: problem pre-processing steps
+    nodes = optimize(nodes, workerData, ({ path: [p] }) => p !== "dyn")
+    nodes = pruneExclusion(nodes, artSetExclusion);
     ({ nodes, arts } = pruneAll(nodes, minimum, arts, maxBuildsToShow, artSetExclusion, {
       reaffine: true, pruneArtRange: true, pruneNodeRange: true, pruneOrder: true
     }))
-    // Can be further folded after pruning
+    // BNB vector pre-processing
     nodes = optimize(nodes, workerData, ({ path: [p] }) => p !== "dyn");
     nodes = thresholdExclusions(nodes, artSetExclusion);
     nodes = thresholdToConstBranchForm(nodes);
@@ -172,7 +160,7 @@ export default function TabBuild() {
     })
     console.log({ artSetExclFull })
     const constraints = nodes
-      .map((value, i) => ({ value, min: minimum[i] }))
+      .map((value, i) => ({ node: value, min: minimum[i] }))
       .filter(x => x.min > -Infinity)
     const artsVec = toArtifactBySlotVec(arts)
     const initialProblem = problemSetup(artsVec, { optimizationTargetNode, nodes, minimum, artSetExclusion })
@@ -219,7 +207,7 @@ export default function TabBuild() {
         artSetExclusion: artSetExclusion,
         plotBase: plotBaseNode,
         maxBuilds: maxBuildsToShow,
-        filters: constraints
+        constraints: constraints
       }
       worker.postMessage(setup, undefined)
       // if (i === 0) {
@@ -514,16 +502,38 @@ function BuildList({ buildsArts, characterKey, data, compareData, disabled, page
   </Suspense>, [buildsArts, characterKey, data, compareData, disabled, pageIdx])
   return list
 }
+function BuildItemWrapper({ index, build, compareData, disabled }: {
+  index: number
+  build: string[],
+  compareData: boolean,
+  disabled: boolean,
+}) {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const toTC = useCallback(() => {
+    const paths = location.pathname.split("/")
+    paths.pop()
+    navigate(`${paths.join("/")}/theorycraft`, { state: { build } })
+  }, [navigate, build, location.pathname])
+
+  return <BuildDisplayItem index={index} compareBuild={compareData} disabled={disabled}
+    extraButtonsLeft={<Button color="info" size="small" startIcon={<Science />} onClick={toTC}>Theorycraft</Button>} />
+}
 
 type Prop = {
   children: React.ReactNode
   characterKey: CharacterKey,
-  build: ICachedArtifact[],
+  build: string[],
   oldData: UIData,
 }
 function DataContextWrapper({ children, characterKey, build, oldData }: Prop) {
+  const { database } = useContext(DatabaseContext)
   const { buildSetting: { mainStatAssumptionLevel } } = useBuildSetting(characterKey)
-  const teamData = useTeamData(characterKey, mainStatAssumptionLevel, build)
+  // Update the build when the build artifacts are changed.
+  const [dirty, setDirty] = useForceUpdate()
+  useEffect(() => database.arts.followAny((id) => build.includes(id) && setDirty()), [database, build, setDirty])
+  const buildsArts = useMemo(() => dirty && build.map(i => database.arts.get(i)!), [dirty, build, database])
+  const teamData = useTeamData(characterKey, mainStatAssumptionLevel, buildsArts)
   const providerValue = useMemo(() => teamData && ({ data: teamData[characterKey]!.target, teamData, oldData }), [teamData, oldData, characterKey])
   if (!providerValue) return null
   return <DataContext.Provider value={providerValue}>

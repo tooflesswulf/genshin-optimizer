@@ -1,6 +1,5 @@
 import { ArtCharDatabase } from '../../../../Database/Database';
 import { DBLocalStorage } from '../../../../Database/DBStorage';
-import { importGOOD } from '../../../../Database/imports/good';
 import { mergeData, uiDataForTeam } from '../../../../Formula/api';
 import { expandPoly } from '../../../../Formula/expandPoly';
 import { optimize } from '../../../../Formula/optimization';
@@ -15,7 +14,7 @@ describe.skip("Worker Perf", () => {
   test("Test", async () => {
 
     const database = new ArtCharDatabase(new DBLocalStorage(localStorage))
-    importGOOD(data1 as any, database, false, false)!
+    database.importGOOD(data1 as any, false, false)!
 
     const teamData = (await getTeamData(database, "Sucrose"))!.teamData
     // Get a new `Data` for `workerData` (and not reuse the old ones) because we are mutating it later

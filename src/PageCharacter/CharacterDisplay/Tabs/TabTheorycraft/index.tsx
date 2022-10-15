@@ -3,8 +3,9 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { CopyAll, DeleteForever, Info, Refresh } from "@mui/icons-material";
 import { Box, Button, ButtonGroup, CardHeader, Divider, Grid, ListItem, MenuItem, Skeleton, Stack, ToggleButton, Typography } from "@mui/material";
 import { WeaponTypeKey } from "pipeline";
-import { useCallback, useContext, useMemo } from "react";
+import { useCallback, useContext, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { useLocation } from "react-router-dom";
 import { ArtifactSetSingleAutocomplete } from "../../../../Components/Artifact/ArtifactAutocomplete";
 import ArtifactSetTooltip from "../../../../Components/Artifact/ArtifactSetTooltip";
 import SetEffectDisplay from "../../../../Components/Artifact/SetEffectDisplay";
@@ -31,7 +32,7 @@ import { DataContext, dataContextObj } from "../../../../Context/DataContext";
 import Artifact, { maxArtifactLevel } from "../../../../Data/Artifacts/Artifact";
 import { ArtifactSheet } from "../../../../Data/Artifacts/ArtifactSheet";
 import WeaponSheet from "../../../../Data/Weapons/WeaponSheet";
-import { initCharTC } from "../../../../Database/Data/CharacterTCData";
+import { initCharTC } from "../../../../Database/DataManagers/CharacterTCData";
 import { DatabaseContext } from "../../../../Database/Database";
 import { uiInput as input } from "../../../../Formula";
 import { computeUIData, dataObjForWeapon } from "../../../../Formula/api";
@@ -40,7 +41,7 @@ import KeyMap, { cacheValueString } from "../../../../KeyMap";
 import useBoolState from "../../../../ReactHooks/useBoolState";
 import usePromise from "../../../../ReactHooks/usePromise";
 import useTeamData from "../../../../ReactHooks/useTeamData";
-import { MainStatKey, SubstatKey } from "../../../../Types/artifact";
+import { ICachedArtifact, MainStatKey, SubstatKey } from "../../../../Types/artifact";
 import { ICharTC, ICharTCArtifactSlot } from "../../../../Types/character";
 import { allSlotKeys, ArtifactRarity, ArtifactSetKey, SetNum, SlotKey, SubstatType, substatType } from "../../../../Types/consts";
 import { ICachedWeapon } from "../../../../Types/weapon";
@@ -64,9 +65,9 @@ export default function TabTheorycraft() {
     },
     [setData, data],
   )
-  const copyFromEquipped = useCallback(
-    () => {
-      const eWeapon = database.weapons.get(character.equippedWeapon)!
+
+  const copyFrom = useCallback(
+    (eWeapon: ICachedWeapon, build: ICachedArtifact[]) => {
       const newData = initCharTC(eWeapon.key)
       newData.artifact.substats.type = data.artifact.substats.type
 
@@ -75,8 +76,7 @@ export default function TabTheorycraft() {
       newData.weapon.refinement = eWeapon.refinement
 
       const sets = {}
-      Object.values(character.equippedArtifacts).forEach(a => {
-        const art = database.arts.get(a)
+      build.forEach(art => {
         if (!art) return
         const { slotKey, setKey, substats, mainStatKey, level, rarity } = art
         newData.artifact.slots[slotKey].level = level
@@ -92,10 +92,26 @@ export default function TabTheorycraft() {
           value === 5 ? 4 :
             value === 1 && !(key as string).startsWith("PrayersFor") ? 0 : value
       ]).filter(([key, value]) => value))
-
       setData(newData)
     },
-    [database, data, character.equippedArtifacts, character.equippedWeapon, setData],
+    [data, setData],
+  )
+  const location = useLocation()
+  const { build: locBuild } = (location.state as { build: string[] } | undefined) ?? { build: undefined }
+  useEffect(() => {
+    if (!locBuild) return
+    const eWeapon = database.weapons.get(character.equippedWeapon)!
+    copyFrom(eWeapon, locBuild.map(i => database.arts.get(i)!))
+    // WARNING: if copyFrom is included, it will cause a render loop due to its setData <---> data
+    // eslint-disable-next-line
+  }, [locBuild, database])
+
+  const copyFromEquipped = useCallback(
+    () => {
+      const eWeapon = database.weapons.get(character.equippedWeapon)!
+      copyFrom(eWeapon, Object.values(character.equippedArtifacts).map(a => database.arts.get(a)!).filter(a => a))
+    },
+    [database, character.equippedArtifacts, character.equippedWeapon, copyFrom],
   )
 
   const weapon: ICachedWeapon = useMemo(() => {

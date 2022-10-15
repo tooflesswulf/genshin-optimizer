@@ -1,4 +1,4 @@
-import { ChevronRight } from '@mui/icons-material';
+import { Checkroom, ChevronRight } from '@mui/icons-material';
 import { Button, CardContent, Grid, Skeleton, Typography } from '@mui/material';
 import { Box } from '@mui/system';
 import { ArtifactSlotKey } from 'pipeline';
@@ -31,10 +31,11 @@ type BuildDisplayItemProps = {
   index?: number,
   compareBuild: boolean,
   disabled?: boolean,
-  extraButtons?: JSX.Element
+  extraButtonsRight?: JSX.Element,
+  extraButtonsLeft?: JSX.Element,
 }
 //for displaying each artifact build
-export default function BuildDisplayItem({ index, compareBuild, extraButtons, disabled }: BuildDisplayItemProps) {
+export default function BuildDisplayItem({ index, compareBuild, extraButtonsRight, extraButtonsLeft, disabled }: BuildDisplayItemProps) {
   const { character: { key: characterKey, equippedArtifacts } } = useContext(CharacterContext)
   const { buildSetting: { mainStatAssumptionLevel } } = useBuildSetting(characterKey)
   const { database } = useContext(DatabaseContext)
@@ -81,8 +82,9 @@ export default function BuildDisplayItem({ index, compareBuild, extraButtons, di
           <SetBadges currentlyEquipped={currentlyEquipped} />
           <Box sx={{ flexGrow: 1, display: "flex", justifyContent: "flex-end" }}>
           </Box>
-          <Button size='small' color="success" onClick={equipBuild} disabled={disabled || currentlyEquipped}>Equip Build</Button>
-          {extraButtons}
+          {extraButtonsLeft}
+          <Button size='small' color="success" onClick={equipBuild} disabled={disabled || currentlyEquipped} startIcon={<Checkroom />}>Equip Build</Button>
+          {extraButtonsRight}
         </Box>
         <Grid container spacing={1} sx={{ pb: 1 }} columns={{ xs: 2, sm: 3, md: 4, lg: 6 }}>
           <Grid item xs={1}>
@@ -138,11 +140,11 @@ function CompareArtifactModal({ newOld: { newId, oldId }, mainStatAssumptionLeve
   return <ModalWrapper open={!!newId} onClose={onClose} containerProps={{ maxWidth: oldId ? "md" : "xs" }}>
     <CardDark>
       <CardContent sx={{ display: "flex", justifyContent: "center", alignItems: "stretch", gap: 2, height: "100%" }}>
-        {oldId && <Box minWidth={320}><ArtifactCard artifactId={oldId} mainStatAssumptionLevel={mainStatAssumptionLevel} canExclude canEquip /></Box>}
+        {oldId && <Box minWidth={320}><ArtifactCard artifactId={oldId} mainStatAssumptionLevel={mainStatAssumptionLevel} canExclude canEquip editorProps={{ disableSet: true, disableSlot: true }} /></Box>}
         {oldId && <Box display="flex" flexGrow={1} />}
         {oldId && <Box display="flex" alignItems="center" justifyContent="center"><Button onClick={onEquip} sx={{ display: "flex" }}><ChevronRight sx={{ fontSize: 40 }} /></Button></Box>}
         {oldId && <Box display="flex" flexGrow={1} />}
-        <Box minWidth={320}><ArtifactCard artifactId={newId} mainStatAssumptionLevel={mainStatAssumptionLevel} canExclude canEquip /></Box>
+        <Box minWidth={320}><ArtifactCard artifactId={newId} mainStatAssumptionLevel={mainStatAssumptionLevel} canExclude canEquip editorProps={{ disableSet: true, disableSlot: true }} /></Box>
       </CardContent>
     </CardDark>
   </ModalWrapper>

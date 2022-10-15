@@ -8,16 +8,11 @@ export type NumNode = ComputeNode | ThresholdNode<NumNode> |
   LookupNode<NumNode> | MatchNode<StrNode, NumNode> | MatchNode<NumNode, NumNode> |
   SubscriptNode<number> |
   ReadNode<number> | ConstantNode<number>
-export type StrNode = StrPrioNode | SmallestNode |
+export type StrNode = StrPrioNode | SmallestNode | ThresholdNode<StrNode> |
   DataNode<StrNode> |
   LookupNode<StrNode> |
   MatchNode<StrNode, StrNode> | MatchNode<NumNode, StrNode> |
   ReadNode<string | undefined> | ConstantNode<string | undefined>
-export type AnyNode = NumNode | StrNode | {
-  operation: string
-  operands: readonly AnyNode[]
-  info?: Info
-}
 
 interface Info {
   key?: string
@@ -32,57 +27,58 @@ interface Info {
 }
 export type Variant = ElementKeyWithPhy | TransformativeReactionsKey | AmplifyingReactionsKey | AdditiveReactionsKey | "heal" | "invalid"
 
-interface Base {
-  operands: readonly AnyNode[]
+export interface Base {
   info?: Info
+  operation: string
+  operands: readonly Base[]
 }
-export interface StrPrioNode extends Base {
+export interface StrPrioNode implements Base {
   operation: "prio"
   operands: readonly StrNode[]
 }
 /** Pick the lexcicographically smallest non-`undefined` value. If all values are `undefined` or there is no value, use `undefined`. */
-export interface SmallestNode extends Base {
+export interface SmallestNode implements Base {
   operation: "small"
   operands: readonly StrNode[]
 }
-export interface LookupNode<Output> extends Base {
+export interface LookupNode<Output> implements Base {
   operation: "lookup"
   operands: readonly [index: StrNode] | readonly [index: StrNode, defaultNode: Output]
   table: Dict<string, Output>
 }
-export interface DataNode<Output> extends Base {
+export interface DataNode<Output> implements Base {
   operation: "data"
   operands: readonly [Output]
   data: Data
   reset?: true
 }
-export interface ComputeNode extends Base {
+export interface ComputeNode implements Base {
   operation: Operation
   operands: readonly NumNode[]
 }
-export interface ThresholdNode<Output> extends Base {
+export interface ThresholdNode<Output> implements Base {
   operation: "threshold"
   operands: readonly [NumNode, NumNode, Output, Output]
   emptyOn?: "ge" | "l"
 }
-export interface MatchNode<Input, Output> extends Base {
+export interface MatchNode<Input, Output> implements Base {
   operation: "match"
   operands: readonly [v1: Input, v2: Input, match: Output, unmatch: Output]
   emptyOn?: "match" | "unmatch"
 }
-export interface SubscriptNode<Value> extends Base {
+export interface SubscriptNode<Value> implements Base {
   operation: "subscript"
   operands: readonly [index: NumNode]
   list: readonly Value[]
 }
-export interface ReadNode<Value> extends Base {
+export interface ReadNode<Value> implements Base {
   operation: "read"
   operands: readonly []
   accu?: Value extends number ? CommutativeMonoidOperation : "small"
   path: readonly string[]
   type: Value extends number ? "number" : Value extends string ? "string" : undefined
 }
-export interface ConstantNode<Value> extends Base {
+export interface ConstantNode<Value> implements Base {
   operation: "const"
   operands: readonly []
   value: Value

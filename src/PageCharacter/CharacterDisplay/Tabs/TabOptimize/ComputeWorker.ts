@@ -33,13 +33,13 @@ export class ComputeWorker {
 
   callback: (interim: InterimResult) => void
 
-  constructor({ arts, artsVec, optimizationTarget, filters, plotBase, maxBuilds }: Setup, callback: (interim: InterimResult) => void) {
+  constructor({ arts, artsVec, optimizationTarget, constraints: filters, plotBase, maxBuilds }: Setup, callback: (interim: InterimResult) => void) {
     this.arts = arts
     this.artsVec = artsVec
     this.min = filters.map(x => x.min)
     this.maxBuilds = maxBuilds
     this.callback = callback
-    this.nodes = filters.map(x => x.value)
+    this.nodes = filters.map(x => x.node)
     this.nodes.push(optimizationTarget)
     if (plotBase) {
       this.plotData = {}
@@ -148,8 +148,8 @@ export class ComputeWorker {
         .slice(0, maxBuilds)
     }
   }
-  interimReport = (count: { tested: number, failed: number, skipped: number }) => {
-    this.refresh(false)
+  interimReport = (count: { tested: number, failed: number, skipped: number }, forced = false) => {
+    this.refresh(forced)
     this.callback({ command: "interim", buildValues: this.buildValues, ...count })
     this.buildValues = []
     count.tested = 0

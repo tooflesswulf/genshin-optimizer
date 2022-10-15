@@ -6,7 +6,7 @@ import { ArtifactBuildData, ArtifactsBySlot, DynStat } from "../PageCharacter/Ch
 import { LinearForm, maxWeight, toLinearUpperBound } from "./linearUpperBound"
 import { foldLikeTerms, ExpandedPolynomial } from "./expandPoly"
 import { ArtifactSetKey } from "../Types/consts"
-import { ArtSetExclusion } from "../Database/Data/BuildsettingData"
+import { ArtSetExclusion } from "../Database/DataManagers/BuildsettingData"
 
 export function foldSum(nodes: readonly NumNode[]) {
   if (nodes.length === 1) return nodes[0]

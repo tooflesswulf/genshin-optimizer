@@ -1,21 +1,25 @@
-import { ArtSetExclusion } from '../../../../Database/Data/BuildsettingData'
+import { ArtSetExclusion } from '../../../../Database/DataManagers/BuildsettingData'
 import { NumNode } from '../../../../Formula/type'
 import { assertUnreachable } from '../../../../Util/Util'
-import { ArtifactsBySlot, ArtifactsBySlotVec, artSetPerm, Build, countBuilds, filterArts, filterFeasiblePerm, PlotData } from "./common"
+import { ArtifactsBySlot, ArtifactsBySlotVec, artSetPerm, Build, countBuilds, filterArts, filterFeasiblePerm, PlotData, RequestFilter } from "./common"
 import { ComputeWorker } from "./ComputeWorker"
-import { SplitWorker } from "./SplitWorker"
+import { DefaultSplitWorker } from "./DefaultSplitWorker"
 import { SubProblem } from './subproblemUtil'
 
-let id: number, splitWorker: SplitWorker, computeWorker: ComputeWorker
+let id: number, splitWorker: DefaultSplitWorker, computeWorker: ComputeWorker
 
 onmessage = ({ data }: { data: WorkerCommand }) => {
-  const command = data.command
+  const { command } = data
   let result: WorkerResult
   switch (command) {
     case "setup":
       id = data.id
       const splitID = `split${id}`, computeID = `compute${id}`
-      splitWorker = new SplitWorker(data, interim => postMessage({ id, source: splitID, ...interim }))
+      // try {
+      //   splitWorker = new BNBSplitWorker(data, interim => postMessage({ id, source: splitID, ...interim }))
+      // } catch {
+      splitWorker = new DefaultSplitWorker(data, interim => postMessage({ id, source: splitID, ...interim }))
+      // }
       computeWorker = new ComputeWorker(data, interim => postMessage({ id, source: computeID, ...interim }))
       result = { command: "iterate" }
       break
@@ -49,7 +53,12 @@ onmessage = ({ data }: { data: WorkerCommand }) => {
       break
     default: assertUnreachable(command)
   }
-  postMessage({ id, ...result });
+  postMessage({ id, ...result })
+}
+
+export interface SplitWorker {
+  addFilter(filter: RequestFilter): void
+  split(newThreshold: number, minCount: number): RequestFilter | undefined
 }
 
 
@@ -64,7 +73,7 @@ export interface Setup {
   artsVec: ArtifactsBySlotVec
 
   optimizationTarget: NumNode
-  filters: { value: NumNode, min: number }[]
+  constraints: { node: NumNode, min: number }[]
   artSetExclusion: ArtSetExclusion
   plotBase: NumNode | undefined,
   maxBuilds: number

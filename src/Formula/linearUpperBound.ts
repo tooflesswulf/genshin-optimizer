@@ -218,6 +218,7 @@ function lub(bounds: { lower: number, upper: number }[]): { w: number[], c: numb
   bounds = bounds.map(({ lower, upper }) => ({ lower: lower / upper, upper: 1 }))
 
   // Setting up the linear program in terms of constraints.
+  // cartesian(bounds) loops 2^n times
   let cons = cartesian(...bounds.map(({ lower, upper }) => [lower, upper])).flatMap((coords) => {
     const prod = coords.reduce((prod, v) => prod * v, 1)
     return [
