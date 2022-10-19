@@ -1,4 +1,3 @@
-import { NumNode } from "./type"
 import { ArtifactsBySlot, ArtifactsBySlotVec, DynStat } from "../PageCharacter/CharacterDisplay/Tabs/TabOptimize/common"
 import { constant, sum, prod, threshold } from "./utils"
 import { ExpandedPolynomial, Monomial, sumM, prodM, constantM, readM, foldLikeTerms } from './expandPoly'

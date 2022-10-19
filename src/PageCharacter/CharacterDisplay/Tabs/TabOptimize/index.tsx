@@ -1,5 +1,3 @@
-import { faCalculator } from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { CheckBox, CheckBoxOutlineBlank, Close, Science, TrendingUp } from '@mui/icons-material';
 import { Alert, Box, Button, ButtonGroup, CardContent, Divider, Grid, Link, MenuItem, Skeleton, ToggleButton, Typography, Pagination } from '@mui/material';
 import React, { Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
@@ -31,7 +29,7 @@ import { CharacterKey, charKeyToLocCharKey, LocationCharacterKey } from '../../.
 import { objectKeyValueMap, objPathValue, range } from '../../../../Util/Util';
 import { FinalizeResult, Setup, WorkerCommand, WorkerResult } from './BackgroundWorker';
 import { maxBuildsToShowList } from './Build';
-import { artSetPerm, Build, filterFeasiblePerm, mergeBuilds, mergePlot, pruneAll, pruneExclusion, RequestFilter } from './common';
+import { Build, mergeBuilds, mergePlot, pruneAll, pruneExclusion } from './common';
 import ArtifactSetConfig from './Components/ArtifactSetConfig';
 import AssumeFullLevelToggle from './Components/AssumeFullLevelToggle';
 import BonusStatsCard from './Components/BonusStatsCard';
@@ -49,7 +47,6 @@ import { countBuildsU, problemSetup, SubProblem, toArtifactBySlotVec } from './s
 import CardDark from '../../../../Components/Card/CardDark';
 import useBuildResult from './useBuildResult';
 import useBuildSetting from './useBuildSetting';
-import { ICachedArtifact } from '../../../../Types/artifact';
 
 export default function TabBuild() {
   const { t } = useTranslation("page_character_optimize")

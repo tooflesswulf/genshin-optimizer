@@ -54,9 +54,11 @@ export function ddx(f: OptNode, binding: (readNode: ReadNode<number>) => string,
           if (operation === "min") return threshold(arg1, arg2, ddx(arg2, binding, diff), ddx(arg1, binding, diff))
           if (operation === "max") return threshold(arg1, arg2, ddx(arg1, binding, diff), ddx(arg2, binding, diff))
           assertUnreachable(operation)
+          break;
         default:
           throw new Error(`[${operation}] node operates on only 1 or 2 arguments. ${f}`)
       }
+      break;
     case "threshold":
       const [value, thr, pass, fail] = f.operands
       if (!zero_deriv(value, binding, diff) || !zero_deriv(thr, binding, diff))

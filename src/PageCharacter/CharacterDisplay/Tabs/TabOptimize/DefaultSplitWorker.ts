@@ -369,7 +369,7 @@ function splitToTargetIx(a: ArtifactsBySlotVec, k: number, targ: number, { filte
   for (let i = 0; i < ababa.length; i += 1) {
     const aa = ababa[i]
     for (let j = aa.length - 1; j > 0; j -= 1) {
-      if (aa[j].v == aa[j - 1].v) {
+      if (aa[j].v === aa[j - 1].v) {
         aa[j - 1].ixs.push(...aa[j].ixs)
         aa.splice(j, 1)
       }

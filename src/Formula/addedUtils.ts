@@ -1,5 +1,4 @@
 import { constant, sum, prod, threshold } from "./utils"
-import { NumNode } from "./type"
 import { allOperations } from "./optimization"
 import { mapFormulas } from "./internal"
 import { ArtifactBuildData, ArtifactsBySlot, DynStat } from "../PageCharacter/CharacterDisplay/Tabs/TabOptimize/common"
@@ -110,7 +109,6 @@ export function reduceFormula(f: OptNode[], lower: DynStat, upper: DynStat) {
     }
   })
 
-  // f2 = optimize(f2, {})
   return f2
 }
 

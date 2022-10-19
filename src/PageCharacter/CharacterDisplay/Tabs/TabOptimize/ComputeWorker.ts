@@ -1,7 +1,7 @@
-import { reduceFormula, statsUpperLower } from '../../../../Formula/addedUtils';
+import { reduceFormula } from '../../../../Formula/addedUtils';
 import { optimize, OptNode, precompute } from '../../../../Formula/optimization';
 import type { InterimResult, Setup } from './BackgroundWorker';
-import { ArtifactBuildData, ArtifactsBySlot, ArtifactsBySlotVec, Build, countBuilds, DynStat, filterArts, filterArts2, mergePlot, PlotData, reaffine, RequestFilter } from './common';
+import { ArtifactBuildData, ArtifactsBySlot, ArtifactsBySlotVec, Build, DynStat, filterArts2, mergePlot, PlotData, reaffine } from './common';
 import { ArtSetExclusionFull, countBuildsU, SubProblem, unionFilterUpperLower } from './subproblemUtil';
 
 function checkArtSetExclusion(setKeyCounts: DynStat, excl: ArtSetExclusionFull) {
@@ -50,7 +50,7 @@ export class ComputeWorker {
 
   computeU(newThreshold: number, subproblem: SubProblem) {
     if (this.threshold < newThreshold) this.threshold = newThreshold
-    const { filters, artSetExclusion, depth } = subproblem
+    const { filters, artSetExclusion } = subproblem
     const self = this // `this` in nested functions means different things
 
     const totalCount = countBuildsU(filters)
