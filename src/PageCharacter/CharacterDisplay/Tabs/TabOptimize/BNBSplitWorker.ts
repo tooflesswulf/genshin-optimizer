@@ -1,11 +1,11 @@
 import { customMapFormula, forEachNodes } from "../../../../Formula/internal";
-import { allOperations } from "../../../../Formula/optimization";
-import { ConstantNode, NumNode } from "../../../../Formula/type";
+import { allOperations, OptNode } from "../../../../Formula/optimization";
+import { ConstantNode } from "../../../../Formula/type";
 import { prod, threshold } from "../../../../Formula/utils";
 import { SlotKey } from "../../../../Types/consts";
-import { assertUnreachable, crawlObject, layeredAssignment, objectKeyValueMap, objectMap, objPathValue } from "../../../../Util/Util";
+import { assertUnreachable, objectKeyValueMap, objectMap } from "../../../../Util/Util";
 import type { InterimResult, Setup, SplitWorker } from "./BackgroundWorker";
-import { ArtifactBuildData, ArtifactsBySlot, computeFullArtRange, computeNodeRange, countBuilds, DynMinMax, DynStat, filterArts, MinMax, pruneAll, RequestFilter } from "./common";
+import { ArtifactBuildData, ArtifactsBySlot, computeFullArtRange, computeNodeRange, countBuilds, DynStat, filterArts, MinMax, pruneAll, RequestFilter } from "./common";
 
 type Approximation = {
   base: number,
@@ -13,7 +13,7 @@ type Approximation = {
   conts: StrictDict<string, number>
 }
 type Filter = {
-  nodes: NumNode[], arts: ArtifactsBySlot
+  nodes: OptNode[], arts: ArtifactsBySlot
   /**
    * The contribution of each artifact to the optimization target. The (over)estimated
    * optimization target value is the sum of contributions of all artifacts in the build.
@@ -28,7 +28,7 @@ type Filter = {
 }
 export class BNBSplitWorker implements SplitWorker {
   min: number[]
-  nodes: NumNode[]
+  nodes: OptNode[]
   arts: ArtifactsBySlot
   maxBuilds: number
 
@@ -43,15 +43,15 @@ export class BNBSplitWorker implements SplitWorker {
 
   callback: (interim: InterimResult) => void
 
-  constructor({ arts, optimizationTarget, constraints: filters, maxBuilds }: Setup, callback: (interim: InterimResult) => void) {
+  constructor({ arts, optimizationTarget, constraints, maxBuilds }: Setup, callback: (interim: InterimResult) => void) {
     this.arts = arts
-    this.min = [-Infinity, ...filters.map(x => x.min)]
-    this.nodes = [optimizationTarget, ...filters.map(x => x.node)]
+    this.min = [-Infinity, ...constraints.map(x => x.min)]
+    this.nodes = [optimizationTarget, ...constraints.map(x => x.node)]
     this.callback = callback
     this.maxBuilds = maxBuilds
 
     // make sure we can approximate it
-    polyUpperBound(this.nodes, computeFullArtRange(arts))
+    linearUpperBound(this.nodes, arts)
   }
 
   addFilter(filter: RequestFilter): void {
@@ -179,87 +179,59 @@ export class BNBSplitWorker implements SplitWorker {
 function maxContribution(arts: ArtifactBuildData[], approximation: Approximation): number {
   return Math.max(...arts.map(({ id }) => approximation.conts[id]!))
 }
-function approximation(nodes: NumNode[], arts: ArtifactsBySlot): Approximation[] {
-  const ranges = computeFullArtRange(arts)
-  const polys = polyUpperBound(nodes, ranges)
-  return linearUpperBound(polys, ranges).map(weight => ({
-    base: dot(arts.base, weight) + (weight.$c ?? 0),
+function approximation(nodes: OptNode[], arts: ArtifactsBySlot): Approximation[] {
+  return linearUpperBound(nodes, arts).map(weight => ({
+    base: dot(arts.base, weight, weight.$c),
     conts: objectKeyValueMap(Object.values(arts.values).flat(),
-      data => [data.id, dot(data.values, weight)])
+      data => [data.id, dot(data.values, weight, 0)])
   }))
 }
-
-type Linear = { [key: string]: number }
-function dot(values: DynStat, lin: Linear): number {
-  return Object.entries(lin).reduce((accu, [key, val]) => accu + (values[key] ?? 0) * val, 0)
+function dot(values: DynStat, lin: DynStat, c: number): number {
+  return Object.entries(values).reduce((accu, [k, v]) => accu + (lin[k] ?? 0) * v, c)
 }
 
-type Const = { $c: number }
-/**
- * Keys on the key path represents the keys used in each monomial term. The coefficient
- * is `number` at the leaf of the path, with `$c` as a separater. For example, the following
- *
- * {
- *   x: {
- *     $c: 2,
- *     y: { $c: 3 }
- *   }
- * }
- *
- * represents 2x * 3xy. The key `$c` is necessary because, without it, we can't express sum of
- * two monomials where one uses a subset of the keys of another, e.g., the example above.
- *
- * CAUTION:
- * Typescript isn't strong enough to enforce that the key `$c`,and only `$c`, can map to `number`
- * values. As is, care must be taken when constructing/updating `Poly`.
- */
-type Poly = { [key: string]: Poly } | Const
-function weightedSum(...entries: readonly (readonly [number, Poly])[]): Poly {
-  if (entries.length === 1 && entries[0][0] === 1) return entries[0][1]
-  const keys = new Set(entries.flatMap(([_, poly]) => Object.keys(poly))), result: Poly = {}
-  for (const key of keys) {
-    if (key === "$c")
-      result[key] = entries.reduce((accu, [weight, poly]) => accu + weight * (poly.$c as number ?? 0), 0) as any
-    else
-      result[key] = weightedSum(...entries
-        .map(([weight, poly]) => [weight, poly[key] as Poly] as const)
-        .filter(([_, poly]) => poly))
-  }
+function weightedSum(...entries: readonly (readonly [number, Linear])[]): Linear
+function weightedSum(...entries: readonly (readonly [number, DynStat])[]): DynStat
+function weightedSum(...entries: readonly (readonly [number, DynStat])[]): DynStat {
+  const result = {}
+  for (const [weight, entry] of entries)
+    for (const [k, v] of Object.entries(entry))
+      result[k] = (result[k] ?? 0) + weight * v
   return result
 }
+export type Linear = DynStat & { $c: number }
+/** Compute a linear upper bound of `nodes` */
+export function linearUpperBound(nodes: OptNode[], arts: ArtifactsBySlot): Linear[] {
+  const cents = weightedSum([1, arts.base], ...Object.values(arts.values).map(arts =>
+    [1 / arts.length, weightedSum(...arts.map(art => [1, art.values] as const))] as const))
+  const getCent = (lin: Linear) => dot(cents, lin, lin.$c)
 
-function linearUpperBound(polys: Poly[], ranges: DynMinMax): Linear[] {
-  throw "TODO"
-}
-
-/** Compute a poly upper bound of `nodes` */
-function polyUpperBound(nodes: NumNode[], ranges: DynMinMax): Poly[] {
-  if (ranges["$c"]) throw new PolyError("Unsupported key", "init")
-  const minMaxes = new Map<NumNode, MinMax>()
-  forEachNodes(nodes, _f => {
-    const f = _f as NumNode, { operation } = f
+  const minMaxes = new Map<OptNode, MinMax>()
+  forEachNodes(nodes, f => {
+    const { operation } = f
     if (operation === "mul") minMaxes.set(f, { min: NaN, max: NaN })
     switch (operation) {
       case "mul": case "min": case "max": case "threshold": case "res": case "sum_frac":
         f.operands.forEach(op => minMaxes.set(op, { min: NaN, max: NaN })); break
     }
   }, _ => _)
-  for (const [node, minMax] of computeNodeRange([...minMaxes.keys()], ranges)) minMaxes.set(node, minMax)
+  const nodeRanges = computeNodeRange([...minMaxes.keys()], computeFullArtRange(arts))
+  for (const [node, minMax] of nodeRanges.entries()) minMaxes.set(node, minMax)
 
-  function slopePoint(slope: number, x0: number, y0: number, poly: Poly): Poly {
-    return weightedSum([1, { $c: y0 - slope * x0 }], [slope, poly])
+  function slopePoint(slope: number, x0: number, y0: number, lin: Linear): Linear {
+    return weightedSum([1, { $c: y0 - slope * x0 }], [slope, lin])
   }
-  function interpolate(x0: number, y0: number, x1: number, y1: number, poly: Poly, upper: boolean): Poly {
+  function interpolate(x0: number, y0: number, x1: number, y1: number, lin: Linear, upper: boolean): Linear {
     if (Math.abs(x0 - x1) < 1e-10)
       return { $c: upper ? Math.max(y0, y1) : Math.min(y0, y1) }
-    return slopePoint((y1 - y0) / (x1 - x0), x0, y0, poly)
+    return slopePoint((y1 - y0) / (x1 - x0), x0, y0, lin)
   }
 
   const upper = "u", lower = "l", outward = "o"
   type Context = typeof upper | typeof lower | typeof outward
-  return customMapFormula<Context, Poly>(nodes, upper, (_f, context, _map) => {
-    const f = _f as NumNode, { operation } = f
-    const map: (op: NumNode, c?: Context) => Poly = (op, c = context) => _map(op, c)
+  return customMapFormula<Context, Linear, OptNode>(nodes, upper, (f, context, _map) => {
+    const { operation } = f
+    const map: (op: OptNode, c?: Context) => Linear = (op, c = context) => _map(op, c)
     const oppositeContext = context === upper ? lower : upper
 
     if (context === outward) {
@@ -267,13 +239,13 @@ function polyUpperBound(nodes: NumNode[], ranges: DynMinMax): Poly[] {
       if (min < 0 && max > 0)
         // TODO: We can bypass this restriction by converting `f`
         // to `min(f, 0)` or `max(f, 0)` as appropriate
-        throw new PolyError("Zero-crossing (outward)", operation)
+        throw new PolyError("Zero-crossing", operation)
       return map(f, max <= 0 ? lower : upper)
     }
 
     switch (operation) {
       case "const": return { $c: f.value }
-      case "read": return { [f.path[1]]: { $c: 1 } }
+      case "read": return { $c: 0, [f.path[1]]: 1 }
       case "add": return weightedSum(...f.operands.map(op => [1, map(op)] as const))
       case "min": case "max": {
         const op = allOperations[operation]
@@ -282,7 +254,8 @@ function polyUpperBound(nodes: NumNode[], ranges: DynMinMax): Poly[] {
 
         const x = map(xOp), c = op(f.operands.filter(op => op.operation === "const")
           .map(c => (c as ConstantNode<number>).value))
-        if (operation === (context === lower ? "max" : "min")) return x
+        if ((operation === "max" && context === lower) || (operation === "min" && context === upper))
+          return x
         const { min, max } = minMaxes.get(xOp)!, yMin = op([min, c]), yMax = op([max, c])
         return interpolate(min, yMin, max, yMax, x, context === upper)
       }
@@ -300,11 +273,10 @@ function polyUpperBound(nodes: NumNode[], ranges: DynMinMax): Poly[] {
         if (context !== upper) throw new PolyError("Unsupported direction", operation)
         const [xOp, cOp] = f.operands
         if (cOp.operation !== "const") throw new PolyError("Non-constant node", operation)
-        const c = cOp.value, { min, max } = minMaxes.get(xOp)!, loc = Math.sqrt((min + c) * (max + c))
+        const x = map(xOp), c = cOp.value, { min, max } = minMaxes.get(xOp)!
+        const loc = Math.sqrt((min + c) * (max + c))
         if (min <= -c) throw new PolyError("Unsupported pattern", operation)
-
-        const x = map(xOp), slope = c / (c + loc) / (c + loc), yLoc = loc / (loc + c)
-        return slopePoint(slope, loc, yLoc, x)
+        return slopePoint(c / (c + loc) / (c + loc), loc, loc / (loc + c), x)
       }
       case "threshold": {
         const [vOp, tOp, pOp, fOp] = f.operands
@@ -333,9 +305,14 @@ function polyUpperBound(nodes: NumNode[], ranges: DynMinMax): Poly[] {
         const { min, max } = minMaxes.get(f)!
         if (min < 0 && max > 0) throw new PolyError("Zero-crossing", operation)
         if ((min < 0 && context !== lower) || (max > 0 && context !== upper))
-          throw new PolyError("Unsupported Direction", operation)
+          throw new PolyError("Unsupported direction", operation)
 
-        const operands = [...f.operands], flattenedOperands: NumNode[] = []
+        // For x/a >= 0, sum{x/a} <= n, and k > 0, it follows that
+        //
+        //   k prod{x} <= k/n prod{a} sum{x/a}
+        //
+        // This follows from AM-GM; prod{x/a} <= (sum{x/a}/n)^n <= sum{x/a}/n
+        const operands = [...f.operands], flattenedOperands: OptNode[] = []
         let coeff = 1
         while (operands.length) {
           const operand = operands.pop()!
@@ -343,23 +320,16 @@ function polyUpperBound(nodes: NumNode[], ranges: DynMinMax): Poly[] {
           else if (operand.operation === "const") coeff *= operand.value;
           else flattenedOperands.push(operand)
         }
-        return flattenedOperands.reduce((result, op) => {
-          let newResult: Poly = {}, lin = map(op, outward)
-          crawlObject(result, [], v => typeof v === "number", (val: number, keys: string[]) => {
-            const path = keys.slice(0, -1) // Remove trailing "$c"
-            const old = objPathValue(newResult, path)
-            const newValue = old
-              ? weightedSum([1, old], [val, lin])
-              : weightedSum([val, lin])
-            if (path.length) layeredAssignment(newResult, path, newValue)
-            else newResult = newValue
-          })
-          return newResult
-        }, { $c: coeff } as Poly)
+        const lins = flattenedOperands.map(op => map(op, outward))
+        const ranges = flattenedOperands.map(op => minMaxes.get(op)!)
+
+        // Set `a` to the centroid of `x`, normalizing so that `sum{x/a} = n`
+        const cents = lins.map(getCent)
+        const factor = cents.reduce((accu, cent, i) => accu + (cent >= 0 ? ranges[i].max : ranges[i].min) / cent, 0)
+        const prod = cents.reduce((a, b) => a * factor * b / lins.length, coeff / factor)
+        return weightedSum(...lins.map((op, i) => [prod / cents[i], op] as const))
       }
 
-      case "data": case "match": case "lookup": case "subscript":
-        throw new PolyError("Unsupported operation", operation)
       default: assertUnreachable(operation)
     }
   })

@@ -5,6 +5,7 @@ import { cartesian } from '../Util/Util'
 import { forEachNodes } from "./internal"
 import { makeid } from "./optimize2"
 import { DynStat } from "../PageCharacter/CharacterDisplay/Tabs/TabOptimize/common"
+import { OptNode } from "./optimization"
 
 function countSlotUsage(node: NumNode): DynStat {
   if (node.operation === 'add') {
@@ -48,7 +49,7 @@ export type Monomial = {
 }
 export type ExpandedPolynomial = {
   terms: Monomial[],
-  nodes: Dict<string, NumNode>,
+  nodes: Dict<string, OptNode>,
 }
 
 export function sumM(...monomials: Monomial[][]): Monomial[] {
@@ -102,11 +103,11 @@ export function foldLikeTerms(mono: Monomial[]): Monomial[] {
  * isVar() is used to check whether any node should be considered a variable on its own.
  */
 type NodeLinkedList = { n: NumNode, tag: string, next: NodeLinkedList | undefined }
-export function expandPoly(node: NumNode, inheritTags?: string[]): ExpandedPolynomial {
+export function expandPoly(node: OptNode, inheritTags?: string[]): ExpandedPolynomial {
   let varMap = {} as Dict<number, NodeLinkedList> // my shitty hashmap
-  let tagMap = {} as Dict<string, NumNode>
+  let tagMap = {} as Dict<string, OptNode>
   const varTags = inheritTags ?? []
-  function lookup(n: NumNode) {
+  function lookup(n: OptNode) {
     let hsh = hashNode(n)
     let z = varMap[hsh]
     while (z !== undefined) {
@@ -122,10 +123,10 @@ export function expandPoly(node: NumNode, inheritTags?: string[]): ExpandedPolyn
 
   let stat2tag = {} as Dict<string, string>
   forEachNodes([node], _ => { }, n => {
-    if (n.operation === 'read') stat2tag[n.path[1]] = lookup(n as NumNode)
+    if (n.operation === 'read') stat2tag[n.path[1]] = lookup(n)
   })
 
-  function toSOP(n: NumNode): Monomial[] {
+  function toSOP(n: OptNode): Monomial[] {
     switch (n.operation) {
       case 'add':
         return sumM(...n.operands.map(toSOP))

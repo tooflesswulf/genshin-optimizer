@@ -1,12 +1,19 @@
-import { NumNode, StrNode, Base } from "./type"
+import { crawlObject, deepClone, objPathValue } from "../Util/Util"
+import { AnyNode, Base, NodeData, NumNode, StrNode } from "./type"
 import { constant } from "./utils"
 
-type Node = NumNode | StrNode
+export function deepNodeClone<T extends NodeData<NumNode | StrNode | undefined>>(data: T): T {
+  const result = deepClone(data)
+  // Restore `Info`
+  crawlObject(result, [], n => n.operation, (node, path) =>
+    node.info = { ...objPathValue(data, path).info })
+  return result
+}
 
-export function forEachNodes(formulas: Node[], topDown: (formula: Node) => void, bottomUp: (formula: Node) => void): void {
-  const visiting = new Set<Node>(), visited = new Set<Node>()
+export function forEachNodes<T extends Base<T> = AnyNode>(formulas: T[], topDown: (formula: T) => void, bottomUp: (formula: T) => void): void {
+  const visiting = new Set<T>(), visited = new Set<T>()
 
-  function traverse(formula: Node) {
+  function traverse(formula: T) {
     if (visited.has(formula)) return
 
     if (visiting.has(formula)) {
@@ -28,19 +35,13 @@ export function forEachNodes(formulas: Node[], topDown: (formula: Node) => void,
   formulas.forEach(traverse)
 }
 
-function what<NodeType>(a: NodeType[], mapf: (formula: NodeType) => NodeType): NodeType[] {
-  return a.map(a => ({ ...a }))
-}
+export function mapFormulas<Input extends Base<Input> = AnyNode, Interim extends Base<Interim> = Input, Output extends Base<Output> = Interim>(formulas: Input[], topDownMap: (formula: Input | Interim) => Interim, bottomUpMap: (current: Interim | Output, orig: Input | Interim) => Output): Output[] {
+  const visiting = new Set<Input | Interim>()
+  const topDownMapped = new Map<Input | Interim, Output>()
+  const bottomUpMapped = new Map<Interim, Output>()
 
-// export function mapFormulas(formulas: NumNode[], topDownMap: (formula: NumNode) => NumNode, bottomUpMap: (current: NumNode, orig: NumNode) => NumNode): NumNode[]
-// export function mapFormulas(formulas: Node[], topDownMap: (formula: Node) => Node, bottomUpMap: (current: Node, orig: Node) => Node): Node[] {
-export function mapFormulas<Nodetype extends Base>(formulas: Nodetype[], topDownMap: (formula: Nodetype) => Nodetype, bottomUpMap: (current: Nodetype, orig: Nodetype) => Nodetype): Nodetype[] {
-  const visiting = new Set<Nodetype>()
-  const topDownMapped = new Map<Nodetype, Nodetype>()
-  const bottomUpMapped = new Map<Nodetype, Nodetype>()
-
-  function check(formula: Nodetype): Nodetype {
-    let topDown = topDownMapped.get(formula)
+  function check(formula: Input | Interim): Output {
+    let topDown: Interim | Output | undefined = topDownMapped.get(formula)
     if (topDown) return topDown
     topDown = topDownMap(formula)
 
@@ -49,7 +50,7 @@ export function mapFormulas<Nodetype extends Base>(formulas: Nodetype[], topDown
 
     if (visiting.has(topDown)) {
       console.error("Found cyclical dependency during formula mapping")
-      throw new Error("Found cyclical dependency during formula mapping")
+      return constant(NaN) as any
     }
     visiting.add(topDown)
 
@@ -62,18 +63,18 @@ export function mapFormulas<Nodetype extends Base>(formulas: Nodetype[], topDown
     return bottomUp
   }
 
-  function traverse(formula: Nodetype): Nodetype {
-    const operands = (formula.operands as Nodetype[]).map(check)
-    return arrayEqual(operands, formula.operands) ? formula : { ...formula, operands } as any
+  function traverse(formula: Interim): Interim | Output {
+    const operands = formula.operands.map(check)
+    return arrayEqual<Interim | Output>(operands, formula.operands) ? formula : { ...formula, operands }
   }
 
   const result = formulas.map(check)
-  return arrayEqual(result, formulas) ? formulas : result
+  return arrayEqual<Input | Output>(result, formulas) ? formulas as any : result
 }
 
-export function customMapFormula<Context, Output>(formulas: NumNode[], context: Context, map: (formula: Node, context: Context, map: (node: NumNode, context: Context) => Output) => Output): Output[] {
-  const contextMapping = new Map<Context, [Set<NumNode>, Map<NumNode, Output>]>()
-  function internalMap(formula: NumNode, context: Context): Output {
+export function customMapFormula<Context, Output, Input extends Base<Input>>(formulas: Input[], context: Context, map: (formula: Input, context: Context, map: (node: Input, context: Context) => Output) => Output): Output[] {
+  const contextMapping = new Map<Context, [Set<Input>, Map<Input, Output>]>()
+  function internalMap(formula: Input, context: Context): Output {
     let current = contextMapping.get(context)
     if (!current) contextMapping.set(context, current = [new Set(), new Map()])
     const [visiting, mapping] = current

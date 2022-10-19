@@ -1,8 +1,11 @@
-import { precompute, testing } from "./optimization"
-import { ConstantNode, Data } from "./type"
-import { constant, customRead, data, max, min, prod, read, resetData, setReadNodeKeys, sum } from "./utils"
+import { forEachNodes } from "./internal"
+import { OptNode, precompute, testing } from "./optimization"
+import { AnyNode, ConstantNode, Data, Info } from "./type"
+import { constant, customRead, data, infoMut, max, min, prod, read, resetData, setReadNodeKeys, sum } from "./utils"
 
-const { constantFold, deduplicate, flatten } = testing
+const { constantFold } = testing
+const deduplicate = testing.deduplicate as any as (nodes: AnyNode[]) => AnyNode
+const flatten = testing.flatten as any as (nodes: AnyNode[]) => AnyNode
 
 const inputs = setReadNodeKeys(Object.fromEntries([...Array(6).keys()].map(i => [i, read("add")])))
 
@@ -44,6 +47,18 @@ describe("optimization", () => {
 
     // Remove wrapper for single-value formula
     expect(constantFold([sum(1, -1, r1)], {})).toEqual([r1])
+
+    {
+      // Removing Info
+      const node = sum(1, -1, infoMut(sum(r1), {} as any), r2, r3)
+      let info: Info | undefined = undefined
+      forEachNodes<AnyNode>([node], _ => _, f => info ||= f.info)
+      expect(info).toBeTruthy()
+
+      info = undefined
+      forEachNodes(constantFold([node], {}), _ => _, f => info ||= f.info)
+      expect(info).toBeFalsy()
+    }
   })
   test("data unpacking", () => {
     const r1 = customRead(["aa"])
@@ -59,7 +74,7 @@ describe("optimization", () => {
       const r1 = inputs[0], r2 = inputs[1], r3 = inputs[2]
       const output1 = sum(1, r1, r2), output2 = prod(r2, r3), output3 = sum(output1, output2)
 
-      const compute = precompute([output1], {}, x => x.path[0], 1)
+      const compute = precompute([output1] as OptNode[], {}, x => x.path[0], 1)
       expect([...compute([{ id: "", values: { 0: 32, 1: 77 } }]).slice(0, 1)]).toEqual([1 + 32 + 77])
     })
     test("Output is read node", () => {
@@ -80,7 +95,7 @@ describe("optimization", () => {
       const r1 = inputs[0], r2 = inputs[1], r3 = inputs[2]
       const output1 = sum(1, r1, r2), output2 = prod(r2, r3), output3 = sum(output1, output2)
 
-      const compute = precompute([output3, output3], {}, x => x.path[0], 1)
+      const compute = precompute([output3, output3] as OptNode[], {}, x => x.path[0], 1)
       expect([...compute([{ id: "", values: { 0: 2, 1: 44, 2: 7 } }]).slice(0, 2)]).toEqual([(1 + 2 + 44) + (44 * 7), (1 + 2 + 44) + (44 * 7)])
     })
   })

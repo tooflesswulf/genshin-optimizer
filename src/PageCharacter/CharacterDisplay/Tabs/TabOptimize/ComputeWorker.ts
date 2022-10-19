@@ -1,6 +1,5 @@
 import { reduceFormula, statsUpperLower } from '../../../../Formula/addedUtils';
-import { optimize, precompute } from '../../../../Formula/optimization';
-import type { NumNode } from '../../../../Formula/type';
+import { optimize, OptNode, precompute } from '../../../../Formula/optimization';
 import type { InterimResult, Setup } from './BackgroundWorker';
 import { ArtifactBuildData, ArtifactsBySlot, ArtifactsBySlotVec, Build, countBuilds, DynStat, filterArts, filterArts2, mergePlot, PlotData, reaffine, RequestFilter } from './common';
 import { ArtSetExclusionFull, countBuildsU, SubProblem, unionFilterUpperLower } from './subproblemUtil';
@@ -22,14 +21,14 @@ export class ComputeWorker {
   builds: Build[] = []
   buildValues: number[] = []
   plotData: PlotData | undefined
-  plotBase: NumNode | undefined
+  plotBase: OptNode | undefined
   threshold: number = -Infinity
   maxBuilds: number
   min: number[]
 
   arts: ArtifactsBySlot
   artsVec: ArtifactsBySlotVec
-  nodes: NumNode[]
+  nodes: OptNode[]
 
   callback: (interim: InterimResult) => void
 

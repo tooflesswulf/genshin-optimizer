@@ -195,8 +195,8 @@ export default function TabUpopt() {
     let qaLookup: Dict<string, QueryArtifact> = {};
     queryArts.forEach(art => qaLookup[art.id] = art)
 
-    let nodes = [optimizationTargetNode, ...valueFilter.map(x => x.value)]
-    nodes = optimize(nodes, workerData, ({ path: [p] }) => p !== "dyn");
+    const nodesPreOpt = [optimizationTargetNode, ...valueFilter.map(x => x.value)]
+    let nodes = optimize(nodesPreOpt, workerData, ({ path: [p] }) => p !== "dyn");
     const query = querySetup(nodes, valueFilter.map(x => x.minimum), curEquip, data);
 
     let artUpOpt = queryArts.map(art => evalArtifact(query, art, false, check4th))
@@ -323,7 +323,7 @@ export default function TabUpopt() {
                   {artifactsToShow.map(art =>
                     <Grid container key={art.id + 'asdfsf'} spacing={1}>
                       <Grid item xs={5} sm={4} md={4} lg={3} xl={3} >
-                        <ArtifactCard artifactId={art.id} editor />
+                        <ArtifactCard artifactId={art.id} editorProps={{}} />
                       </Grid>
                       <Grid item xs={7} sm={8} md={8} lg={9} xl={9}>
                         <UpgradeOptChartCard upgradeOpt={art} objMax={maxObj0} objMin={minObj0} />

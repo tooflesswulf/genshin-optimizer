@@ -1,5 +1,5 @@
 import { ArtSetExclusion } from '../../../../Database/DataManagers/BuildsettingData'
-import { NumNode } from '../../../../Formula/type'
+import { OptNode } from '../../../../Formula/optimization'
 import { assertUnreachable } from '../../../../Util/Util'
 import { ArtifactsBySlot, ArtifactsBySlotVec, artSetPerm, Build, countBuilds, filterArts, filterFeasiblePerm, PlotData, RequestFilter } from "./common"
 import { ComputeWorker } from "./ComputeWorker"
@@ -15,17 +15,12 @@ onmessage = ({ data }: { data: WorkerCommand }) => {
     case "setup":
       id = data.id
       const splitID = `split${id}`, computeID = `compute${id}`
-      // try {
-      //   splitWorker = new BNBSplitWorker(data, interim => postMessage({ id, source: splitID, ...interim }))
-      // } catch {
       splitWorker = new DefaultSplitWorker(data, interim => postMessage({ id, source: splitID, ...interim }))
-      // }
       computeWorker = new ComputeWorker(data, interim => postMessage({ id, source: computeID, ...interim }))
       result = { command: "iterate" }
       break
     case "split":
       result = { command: "split", subproblems: splitWorker.split(data), ready: splitWorker.subproblems.length === 0 }
-      // console.log(id, splitWorker.subproblems)
       break
     case "iterate":
       const { threshold, subproblem } = data
@@ -72,10 +67,10 @@ export interface Setup {
   arts: ArtifactsBySlot
   artsVec: ArtifactsBySlotVec
 
-  optimizationTarget: NumNode
-  constraints: { node: NumNode, min: number }[]
+  optimizationTarget: OptNode
+  constraints: { node: OptNode, min: number }[]
   artSetExclusion: ArtSetExclusion
-  plotBase: NumNode | undefined,
+  plotBase: OptNode | undefined,
   maxBuilds: number
 }
 export interface Split {

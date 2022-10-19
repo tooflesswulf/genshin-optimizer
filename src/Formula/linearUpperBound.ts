@@ -1,11 +1,10 @@
 import { NumNode } from "./type"
 import { ArtifactsBySlot, ArtifactsBySlotVec, DynStat } from "../PageCharacter/CharacterDisplay/Tabs/TabOptimize/common"
-import { constant, sum, prod, cmp } from "./utils"
+import { constant, sum, prod, threshold } from "./utils"
 import { ExpandedPolynomial, Monomial, sumM, prodM, constantM, readM, foldLikeTerms } from './expandPoly'
-import { precompute, allOperations } from "./optimization"
+import { precompute, allOperations, OptNode } from "./optimization"
 import { solveLP } from './solveLP_simplex'
 import { cartesian } from '../Util/Util'
-import { fillBuffer } from "./addedUtils"
 
 export type LinearForm = {
   w: DynStat,
@@ -18,7 +17,7 @@ export type LinearFormVec = {
   err: number
 }
 
-function minMax(node: NumNode, lower: DynStat, upper: DynStat) {
+function minMax(node: OptNode, lower: DynStat, upper: DynStat) {
   const compute = precompute([node], {}, n => n.path[1], 1)
   const minval = compute([{ id: '', values: lower }])[0]
   const maxval = compute([{ id: '', values: upper }])[0]
@@ -29,8 +28,8 @@ function minMax(node: NumNode, lower: DynStat, upper: DynStat) {
  * `res` is the ONE place where negative arguments & negative slopes are allowed.
  * @param node
  */
-function handleResArg(node: { 'operation': 'res', 'operands': NumNode[] }, lower: DynStat, upper: DynStat) {
-  function flipOps(n: NumNode): NumNode {
+function handleResArg(node: OptNode, lower: DynStat, upper: DynStat) {
+  function flipOps(n: OptNode): OptNode {
     switch (n.operation) {
       case 'add':
         return sum(...n.operands.map(n => flipOps(n)))
@@ -40,7 +39,7 @@ function handleResArg(node: { 'operation': 'res', 'operands': NumNode[] }, lower
         const [branch, bval, ge, lt] = n.operands
         if (ge.operation === 'const' && lt.operation === 'const') {
           if (ge.value <= lt.value) {
-            return cmp(branch, bval, -ge.value, -lt.value)
+            return threshold(branch, bval, -ge.value, -lt.value)
           }
         }
         console.log(n)
@@ -51,7 +50,7 @@ function handleResArg(node: { 'operation': 'res', 'operands': NumNode[] }, lower
     }
   }
 
-  const flippedResOp = flipOps(node.operands[0])
+  const flippedResOp = flipOps(node.operands[0]!)
 
   let [a, b] = minMax(flippedResOp, lower, upper)
   let resf = allOperations['res']
@@ -86,7 +85,7 @@ export function toLinearUpperBound({ nodes, terms }: ExpandedPolynomial, lower: 
   })
 
   let linerr = 0
-  function toPureRead(n: NumNode): Monomial[] {
+  function toPureRead(n: OptNode): Monomial[] {
     switch (n.operation) {
       case 'const':
         return constantM(n.value)
@@ -122,7 +121,7 @@ export function toLinearUpperBound({ nodes, terms }: ExpandedPolynomial, lower: 
         console.log(n)
         throw Error('Not Implemented (threshold must branch between constants)')
       case 'res':
-        let op = handleResArg(n as { 'operation': 'res', 'operands': NumNode[] }, lower, upper)
+        let op = handleResArg(n, lower, upper)
         return toPureRead(op)
 
       case 'min': case 'max':

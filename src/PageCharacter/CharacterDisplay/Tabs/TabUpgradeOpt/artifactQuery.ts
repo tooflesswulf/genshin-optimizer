@@ -1,5 +1,5 @@
 import { Data, NumNode } from "../../../../Formula/type"
-import { precompute, optimize } from "../../../../Formula/optimization"
+import { precompute, optimize, OptNode } from "../../../../Formula/optimization"
 import { ddx, zero_deriv } from "../../../../Formula/differentiate"
 import { DynStat } from '../../../..//PageCharacter/CharacterDisplay/Tabs/TabOptimize/common'
 import { SubstatKey, allSubstatKeys, ICachedArtifact } from "../../../../Types/artifact"
@@ -246,8 +246,8 @@ function gmmNd({ rollsLeft, stats, subs, thresholds, calc4th, scale, objectiveEv
   return { prob: p_ret, upAvg: upAvg_ret, distr: appx }
 }
 
-export function querySetup(formulas: NumNode[], thresholds: number[], curBuild: QueryBuild, data: Data = {}): Query {
-  let toEval: NumNode[] = []
+export function querySetup(formulas: OptNode[], thresholds: number[], curBuild: QueryBuild, data: Data = {}): Query {
+  let toEval: OptNode[] = []
   formulas.forEach(f => {
     toEval.push(f, ...allSubstatKeys.map(sub => ddx(f, fo => fo.path[1], sub)))
   })

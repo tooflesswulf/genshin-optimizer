@@ -7,7 +7,7 @@ import { LinearForm } from '../../../../Formula/linearUpperBound';
 import { applyLinearForm, countBuildsU, reduceSubProblem, RequestFilter2, slotUpperLowerVec, slotUpperLowerVecW, statsUpperLowerVec, SubProblem, SubProblemWC, UnionFilter2, unionFilterUpperLower } from './subproblemUtil';
 
 export class DefaultSplitWorker {
-  min: number[]
+min: number[]
 
   arts: ArtifactsBySlot
   artsVec: ArtifactsBySlotVec
@@ -20,11 +20,11 @@ export class DefaultSplitWorker {
 
   callback: (interim: InterimResult) => void
 
-  constructor({ arts, artsVec, optimizationTarget, constraints: filters, artSetExclusion }: Setup, callback: (interim: InterimResult) => void) {
+  constructor({ arts, artsVec, optimizationTarget, constraints, artSetExclusion }: Setup, callback: (interim: InterimResult) => void) {
     this.arts = arts
     this.artsVec = artsVec  // buffer is volatile, shared memory problems?
-    this.min = filters.map(x => x.min)
-    this.nodes = filters.map(x => x.node)
+    this.min = constraints.map(x => x.min)
+    this.nodes = constraints.map(x => x.node)
     this.callback = callback
 
     this.min.push(-Infinity)

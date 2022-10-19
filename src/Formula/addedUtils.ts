@@ -1,4 +1,4 @@
-import { constant, sum, prod, cmp } from "./utils"
+import { constant, sum, prod, threshold } from "./utils"
 import { NumNode } from "./type"
 import { allOperations } from "./optimization"
 import { mapFormulas } from "./internal"
@@ -6,9 +6,10 @@ import { ArtifactBuildData, ArtifactsBySlot, DynStat } from "../PageCharacter/Ch
 import { LinearForm, maxWeight, toLinearUpperBound } from "./linearUpperBound"
 import { foldLikeTerms, ExpandedPolynomial } from "./expandPoly"
 import { ArtifactSetKey } from "../Types/consts"
+import { OptNode } from "./optimization"
 import { ArtSetExclusion } from "../Database/DataManagers/BuildsettingData"
 
-export function foldSum(nodes: readonly NumNode[]) {
+export function foldSum(nodes: readonly OptNode[]) {
   if (nodes.length === 1) return nodes[0]
   nodes = nodes.flatMap(n => n.operation === 'add' ? n.operands : n)
   let constVal = nodes.reduce((pv, n) => n.operation === 'const' ? pv + n.value : pv, 0)
@@ -22,7 +23,7 @@ export function foldSum(nodes: readonly NumNode[]) {
   return sum(...nodes, constant(constVal))
 }
 
-export function foldProd(nodes: readonly NumNode[]) {
+export function foldProd(nodes: readonly OptNode[]) {
   if (nodes.length === 1) return nodes[0]
   nodes = nodes.flatMap(n => n.operation === 'mul' ? n.operands : n)
   let constVal = nodes.reduce((pv, n) => n.operation === 'const' ? pv * n.value : pv, 1)
@@ -76,7 +77,7 @@ export function statsUpperLower(a: ArtifactsBySlot) {
   return { statsMin, statsMax }
 }
 
-export function reduceFormula(f: NumNode[], lower: DynStat, upper: DynStat) {
+export function reduceFormula(f: OptNode[], lower: DynStat, upper: DynStat) {
   const fixedStats = Object.keys(lower).filter(statKey => lower[statKey] === upper[statKey])
   let f2 = mapFormulas(f, n => n, n => {
     switch (n.operation) {
@@ -217,7 +218,7 @@ export function fillBuffer(stats: DynStat, mapping: Dict<string, number>, buffer
     .forEach(([k, v]) => buffer[mapping[k]!] = v)
 }
 
-export function thresholdExclusions(nodes: NumNode[], excl: ArtSetExclusion) {
+export function thresholdExclusions(nodes: OptNode[], excl: ArtSetExclusion) {
   nodes = mapFormulas(nodes, n => n, n => {
     switch (n.operation) {
       case 'threshold':
@@ -229,7 +230,7 @@ export function thresholdExclusions(nodes: NumNode[], excl: ArtSetExclusion) {
             // Based on exclusion, either return `lt` or shift `branchVal` to 4.
             if (branchVal.value === 2 && exc.includes(2)) {
               if (exc.includes(4)) return lt
-              return cmp(branch, 4, ge, lt)
+              return threshold(branch, 4, ge, lt)
             }
             if (branchVal.value === 4 && exc.includes(4))
               return lt

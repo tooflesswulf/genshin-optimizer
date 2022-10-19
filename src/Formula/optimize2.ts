@@ -4,7 +4,8 @@ import { reduceFormula, statsUpperLower } from "./addedUtils";
 import { foldProd, foldSum } from "./addedUtils";
 import { forEachNodes, mapFormulas } from "./internal";
 import { NumNode, ReadNode } from "./type";
-import { cmp, constant, prod, sum } from './utils';
+import { threshold, constant, prod, sum } from './utils';
+import { OptNode } from "./optimization";
 
 export function makeid(length: number, disallowed?: string[]) {
   var characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -45,17 +46,17 @@ function deleteKey(a: ArtifactsBySlot, key: string) {
  * @param a     ArtifactsBySlot, modified in-place
  * @param nodes Objective function and/or constraints
  */
-function collapseAffine(a: ArtifactsBySlot, nodes: NumNode[]) {
+function collapseAffine(a: ArtifactsBySlot, nodes: OptNode[]) {
   const allKeys = Object.keys(a.base)
   let addedRegisters = {} as { [key: string]: { base: number, coeff: number, sumKeys: string[] } }
-  function distributeProd(n: NumNode, v: number) {
+  function distributeProd(n: OptNode, v: number) {
     if (!isShallow(n)) throw Error('`distribute` only works on shallow node type.')
     if (v === 1) return n
     switch (n.operation) {
       case 'threshold':
         let [branch, bval, ge, lt] = n.operands
         if (branch.operation === 'read') {
-          return cmp(branch, bval, foldProd([ge, constant(v)]), foldProd([lt, constant(v)]), { source: branch.path[1] as ArtifactSetKey })
+          return threshold(branch, bval, foldProd([ge, constant(v)]), foldProd([lt, constant(v)]), { source: branch.path[1] as ArtifactSetKey })
         }
         console.log(n)
         throw Error('branch is not read...?')
@@ -77,7 +78,7 @@ function collapseAffine(a: ArtifactsBySlot, nodes: NumNode[]) {
       case 'mul':
         let fMops = f.operands
         if (fMops.some(n => n.operation === 'mul')) {
-          const toFold = fMops.filter(n => n.operation === 'mul').flatMap(n => [...n.operands]) as NumNode[]
+          const toFold = fMops.filter(n => n.operation === 'mul').flatMap(n => [...n.operands])
           const orig = fMops.filter(n => n.operation !== 'mul')
           fMops = [...orig, ...toFold]
         }
@@ -94,7 +95,7 @@ function collapseAffine(a: ArtifactsBySlot, nodes: NumNode[]) {
       case 'add':
         let fAops = f.operands
         if (fAops.some(n => n.operation === 'add')) {
-          const toFold = fAops.filter(n => n.operation === 'add').flatMap(n => [...n.operands]) as NumNode[]
+          const toFold = fAops.filter(n => n.operation === 'add').flatMap(n => [...n.operands])
           const goodboyes = fAops.filter(n => n.operation !== 'add')
           fAops = [...goodboyes, ...toFold]
         }
@@ -149,7 +150,7 @@ function collapseAffine(a: ArtifactsBySlot, nodes: NumNode[]) {
   return { a, nodes: newNodes }
 }
 
-export function elimLinDepStats(a: ArtifactsBySlot, nodes: NumNode[]) {
+export function elimLinDepStats(a: ArtifactsBySlot, nodes: OptNode[]) {
   // Step 1. Find all constants and eliminate them from the equation.
   const { statsMin, statsMax } = statsUpperLower(a)
   nodes = reduceFormula(nodes, statsMin, statsMax);
@@ -220,7 +221,7 @@ export function elimLinDepStats(a: ArtifactsBySlot, nodes: NumNode[]) {
   return { a, nodes }
 }
 
-export function thresholdToConstBranchForm(nodes: NumNode[]) {
+export function thresholdToConstBranchForm(nodes: OptNode[]) {
   return mapFormulas(nodes, n => n, n => {
     switch (n.operation) {
       case "threshold":
@@ -235,15 +236,15 @@ export function thresholdToConstBranchForm(nodes: NumNode[]) {
             let left = ge2.value >= bval.value ? ge : lt
             let right = lt2.value >= bval.value ? ge : lt
 
-            console.log('non-stacking buff', n, cmp(br2, bv2, left, right))
-            return cmp(br2, bv2, left, right)
+            console.log('non-stacking buff', n, threshold(br2, bv2, left, right))
+            return threshold(br2, bv2, left, right)
           }
           console.log('faulty node:', n)
           throw Error('Not Implemented: nested threshold must follow the form [read, const, const, const]')
         }
         if (ge.operation !== 'const' || lt.operation !== 'const') {
           if (lt.operation === 'const' && lt.value === 0) {
-            return prod(cmp(branch, bval, 1, 0), ge)
+            return prod(threshold(branch, bval, 1, 0), ge)
           }
           console.log('faulty node:', n)
           throw Error('Not Implemented: threshold() node with non-constant `pass` AND non-zero `fail`')
