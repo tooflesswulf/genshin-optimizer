@@ -1,4 +1,4 @@
-import { ArtSetExclusion } from "../../../../Database/DataManagers/BuildsettingData"
+import { ArtSetExclusion } from "../../../../Database/DataManagers/BuildSettingData"
 import { reducePolynomial } from "../../../../Formula/addedUtils"
 import { ExpandedPolynomial, expandPoly, toNumNode } from "../../../../Formula/expandPoly"
 import { LinearForm, minMaxWeightVec, toLinearUpperBound } from "../../../../Formula/linearUpperBound"

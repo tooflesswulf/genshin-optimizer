@@ -2,8 +2,7 @@ import { faStar } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { CopyAll, DeleteForever, Info, Refresh } from "@mui/icons-material";
 import { Box, Button, ButtonGroup, CardHeader, Divider, Grid, ListItem, MenuItem, Skeleton, Slider, Stack, ToggleButton, Typography } from "@mui/material";
-import { WeaponTypeKey } from "pipeline";
-import { Suspense, useCallback, useContext, useDeferredValue, useEffect, useMemo, useState } from "react";
+import React, { Suspense, useCallback, useContext, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation } from "react-router-dom";
 import { ArtifactSetSingleAutocomplete } from "../../../../Components/Artifact/ArtifactAutocomplete";
@@ -26,7 +25,6 @@ import RefinementDropdown from "../../../../Components/RefinementDropdown";
 import SolidToggleButtonGroup from "../../../../Components/SolidToggleButtonGroup";
 import { StatColoredWithUnit, StatWithUnit } from "../../../../Components/StatDisplay";
 import StatIcon from "../../../../Components/StatIcon";
-import WeaponSelectionModal from "../../../../Components/Weapon/WeaponSelectionModal";
 import { CharacterContext } from "../../../../Context/CharacterContext";
 import { DataContext, dataContextObj } from "../../../../Context/DataContext";
 import Artifact, { maxArtifactLevel } from "../../../../Data/Artifacts/Artifact";
@@ -43,11 +41,12 @@ import usePromise from "../../../../ReactHooks/usePromise";
 import useTeamData from "../../../../ReactHooks/useTeamData";
 import { ICachedArtifact, MainStatKey, SubstatKey } from "../../../../Types/artifact";
 import { ICharTC, ICharTCArtifactSlot } from "../../../../Types/character";
-import { allSlotKeys, ArtifactRarity, ArtifactSetKey, SetNum, SlotKey, SubstatType, substatType } from "../../../../Types/consts";
+import { allSlotKeys, ArtifactRarity, ArtifactSetKey, SetNum, SlotKey, SubstatType, substatType, WeaponTypeKey } from "../../../../Types/consts";
 import { ICachedWeapon } from "../../../../Types/weapon";
 import { deepClone, objectMap } from "../../../../Util/Util";
 import { defaultInitialWeaponKey } from "../../../../Util/WeaponUtil";
 import useCharTC from "./useCharTC";
+const WeaponSelectionModal = React.lazy(() => import('../../../../Components/Weapon/WeaponSelectionModal'))
 
 type ISet = Partial<Record<ArtifactSetKey, 1 | 2 | 4>>
 export default function TabTheorycraft() {

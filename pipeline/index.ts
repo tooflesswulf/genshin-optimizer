@@ -79,6 +79,8 @@ export const characterIdMap = {
   10000070: "Nilou",
   10000071: "Cyno",
   10000072: "Candace",
+  10000073: "Nahida",
+  10000074: "Layla",
   // 11000008: "TEMPLATE",
   // 11000009: "TEMPLATE",
   // 11000010: "TEMPLATE",
@@ -233,6 +235,7 @@ export const weaponIdMap = {
   // 14506: "Diamond Visage",
   // 14508: "",
   14509: "KagurasVerity",
+  14511: "AThousandFloatingDreams",
 
   //bow
   15101: "HuntersBow",

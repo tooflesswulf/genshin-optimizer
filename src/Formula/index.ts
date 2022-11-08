@@ -1,5 +1,5 @@
 import KeyMap, { allEleEnemyResKeys } from "../KeyMap"
-import { transformativeReactionLevelMultipliers } from "../KeyMap/StatConstants"
+import { crittableTransformativeReactions, transformativeReactionLevelMultipliers } from "../KeyMap/StatConstants"
 import { artifactTr } from "../names"
 import { allArtifactSets, allElementsWithPhy, allRegions, allSlotKeys } from "../Types/consts"
 import { crawlObject, objectKeyMap, objectKeyValueMap } from "../Util/Util"
@@ -20,6 +20,7 @@ const allMisc = [
   "stamina", "staminaDec_", "staminaSprintDec_", "staminaGlidingDec_", "staminaChargedDec_",
   "incHeal_", "shield_", "cdRed_", "moveSPD_", "atkSPD_", "weakspotDMG_", "dmgRed_", "healInc"
 ] as const
+const allBase = ["base_atk", "base_hp", "base_def"] as const
 
 const allModStats = [
   ...allArtModStats,
@@ -34,10 +35,15 @@ const allNonModStats = [
     `${x}_dmgInc` as const,
     `${x}_critDMG_` as const,
     `${x}_critRate_` as const]),
+  ...crittableTransformativeReactions.flatMap(x => [
+    `${x}_critRate_` as const,
+    `${x}_critDMG_` as const,
+  ]),
   "all_dmgInc" as const,
   ...allEleEnemyResKeys,
   "enemyDefRed_" as const,
   ...allMisc,
+  ...allBase,
 ] as const
 
 export const allInputPremodKeys = [...allModStats, ...allNonModStats] as const
@@ -58,6 +64,10 @@ for (const ele of allElements) {
 for (const reaction of [...allTransformative, ...allAmplifying, ...allAdditive]) {
   allModStatNodes[`${reaction}_dmg_`].info!.variant = reaction
 }
+crittableTransformativeReactions.forEach(reaction => {
+  allNonModStatNodes[`${reaction}_critRate_`].info!.variant = reaction
+  allNonModStatNodes[`${reaction}_critDMG_`].info!.variant = reaction
+})
 allNonModStatNodes.healInc.info!.variant = "heal"
 allNonModStatNodes.incHeal_.info!.variant = "heal"
 allModStatNodes.heal_.info!.variant = "heal"
@@ -156,6 +166,7 @@ const baseAmpBonus = infoMut(sum(one, prod(25 / 9, frac(total.eleMas, 1400))), {
 const baseAddBonus = sum(one, prod(5, frac(total.eleMas, 1200)))
 
 const common: Data = {
+  base: objectKeyMap(["atk", "def", "hp"], key => input.customBonus[`base_${key}`]),
   premod: {
     ...objectKeyMap(allTalents, talent => bonus[talent]),
     ...objectKeyMap(allNonModStats, key => {

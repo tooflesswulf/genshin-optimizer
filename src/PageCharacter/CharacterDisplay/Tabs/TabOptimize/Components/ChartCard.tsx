@@ -1,17 +1,15 @@
-import { CheckBox, CheckBoxOutlineBlank, Download, Info } from '@mui/icons-material';
-import { Button, CardContent, Collapse, Divider, Grid, MenuItem, styled, Tooltip, Typography } from '@mui/material';
-import { useContext, useMemo, useState } from 'react';
+import { CheckBox, CheckBoxOutlineBlank, Download, Replay } from '@mui/icons-material';
+import { Button, CardContent, Collapse, Divider, Grid, styled, Typography } from '@mui/material';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, Scatter, XAxis, YAxis, ZAxis } from 'recharts';
+import { CartesianGrid, ComposedChart, Label, Legend, Line, ResponsiveContainer, Scatter, XAxis, YAxis, ZAxis } from 'recharts';
+import BootstrapTooltip from '../../../../../Components/BootstrapTooltip';
 import CardDark from '../../../../../Components/Card/CardDark';
 import CardLight from '../../../../../Components/Card/CardLight';
-import DropdownButton from '../../../../../Components/DropdownMenu/DropdownButton';
-import { DataContext } from '../../../../../Context/DataContext';
-import { uiInput as input } from '../../../../../Formula';
+import InfoTooltip from '../../../../../Components/InfoTooltip';
 import { NumNode } from '../../../../../Formula/type';
-import KeyMap from '../../../../../KeyMap';
-import { MainStatKey, SubstatKey } from '../../../../../Types/artifact';
 import { Build } from '../common';
+import OptimizationTargetSelector from './OptimizationTargetSelector';
 
 export type ChartData = {
   valueNode: NumNode,
@@ -20,19 +18,16 @@ export type ChartData = {
 }
 type ChartCardProps = {
   chartData?: ChartData
-  plotBase: MainStatKey | SubstatKey | "",
-  setPlotBase: (key: MainStatKey | SubstatKey | "") => void
+  plotBase?: string[],
+  setPlotBase: (path: string[] | undefined) => void
   disabled?: boolean
+  showTooltip?: boolean
 }
 type Point = { x: number, y: number, min?: number }
-export default function ChartCard({ chartData, plotBase, setPlotBase, disabled = false }: ChartCardProps) {
+export default function ChartCard({ chartData, plotBase, setPlotBase, disabled = false, showTooltip = false }: ChartCardProps) {
   const { t } = useTranslation(["page_character_optimize", "ui"])
   const [showDownload, setshowDownload] = useState(false)
   const [showMin, setshowMin] = useState(true)
-  const { data } = useContext(DataContext)
-  const statKeys = ["atk", "hp", "def", "eleMas", "critRate_", "critDMG_", "heal_", "enerRech_"]
-  if (data.get(input.weaponType).value !== "catalyst") statKeys.push("physical_dmg_")
-  statKeys.push(`${data.get(input.charEle).value}_dmg_`)
 
   const { displayData, downloadData } = useMemo(() => {
     if (!chartData) return { displayData: null, downloadData: null }
@@ -71,19 +66,26 @@ export default function ChartCard({ chartData, plotBase, setPlotBase, disabled =
           <Typography >{t`tcGraph.vs`}</Typography>
         </Grid>
         <Grid item>
-          <DropdownButton size='small' title={plotBase ? KeyMap.get(plotBase) : t`tcGraph.notSel`}
-            color={plotBase ? "success" : "primary"}
-            disabled={disabled}
-          >
-            <MenuItem onClick={() => { setPlotBase("") }}>{t`ui:unselect`}</MenuItem>
-            <Divider />
-            {statKeys.map(sKey => <MenuItem key={sKey} onClick={() => { setPlotBase(sKey as any) }}>{KeyMap.get(sKey)}</MenuItem>)}
-          </DropdownButton>
+          <BootstrapTooltip placement="top" title={showTooltip ? t("page_character_optimize:selectTargetFirst") : ""}>
+            <span>
+              <OptimizationTargetSelector
+                optimizationTarget={plotBase}
+                setTarget={target => setPlotBase(target)}
+                defaultText={t("page_character_optimize:targetSelector.selectGraphTarget")}
+                disabled={disabled}
+              />
+            </span>
+          </BootstrapTooltip>
+        </Grid>
+        <Grid item>
+          <BootstrapTooltip title={!plotBase ? "" : t("ui:reset")} placement="top">
+            <span><Button color="error" onClick={() => setPlotBase(undefined)} disabled={!plotBase}>
+              <Replay />
+            </Button></span>
+          </BootstrapTooltip>
         </Grid>
         <Grid item flexGrow={1}>
-          <Tooltip placement="top" title="Using data from the builder, this will generate a graph to visualize Optimization Target vs. a selected stat. The graph will show the maximum Optimization Target value per 0.01 of the selected stat.">
-            <Info />
-          </Tooltip>
+          <InfoTooltip placement="top" title={t("page_character_optimize:tcGraph.desc")} />
         </Grid>
         {!!downloadData && <Grid item>
           <Button size='small' startIcon={showMin ? <CheckBox /> : <CheckBoxOutlineBlank />}
@@ -131,15 +133,29 @@ function Chart({ displayData, plotNode, valueNode, showMin }: {
   showMin: boolean
 }) {
   const { t } = useTranslation("page_character_optimize")
+  // Below works because character translation should already be loaded
+  const xLabel = <Label fill="white" dy={10}>
+    {getLabelFromNode(plotNode, t)}
+  </Label>
+  const yLabel = <Label fill="white" angle={-90} dx={-40}>
+    {getLabelFromNode(valueNode, t)}
+  </Label>
   return <ResponsiveContainer width="100%" height={600}>
     <ComposedChart data={displayData}>
       <CartesianGrid strokeDasharray="3 3" />
-      <XAxis dataKey="x" scale="linear" unit={plotNode.info?.unit} domain={["auto", "auto"]} tick={{ fill: 'white' }} type="number" tickFormatter={n => n > 10000 ? n.toFixed() : n.toFixed(1)} />
-      <YAxis name="DMG" domain={["auto", "auto"]} unit={valueNode.info?.unit} allowDecimals={false} tick={{ fill: 'white' }} type="number" />
+      <XAxis dataKey="x" scale="linear" unit={plotNode.info?.unit} domain={["auto", "auto"]} tick={{ fill: 'white' }} type="number" tickFormatter={n => n > 10000 ? n.toFixed() : n.toFixed(1)} label={xLabel} height={50} />
+      <YAxis name="DMG" domain={["auto", "auto"]} unit={valueNode.info?.unit} allowDecimals={false} tick={{ fill: 'white' }} type="number" label={yLabel} width={100} />
       <ZAxis dataKey="y" range={[3, 25]} />
       <Legend />
       <Scatter name={t`tcGraph.optTarget`} dataKey="y" fill="#8884d8" line lineType="fitting" isAnimationActive={false} />
       {showMin && <Line name={t`tcGraph.minStatReqThr`} dataKey="min" stroke="#ff7300" type="stepBefore" connectNulls strokeWidth={2} isAnimationActive={false} />}
     </ComposedChart>
   </ResponsiveContainer>
+}
+
+function getLabelFromNode(node: NumNode, t: any) {
+  console.log(node)
+  return typeof node.info?.name === "string"
+    ? node.info.name
+    : `${t(`${node.info?.name?.props.ns}:${node.info?.name?.props.key18}`)}${node.info?.textSuffix ? ` ${node.info?.textSuffix}` : ""}`
 }

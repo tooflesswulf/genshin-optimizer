@@ -1,8 +1,8 @@
 import { StatKey } from "../../KeyMap";
 import { maxBuildsToShowDefault, maxBuildsToShowList } from "../../PageCharacter/CharacterDisplay/Tabs/TabOptimize/Build";
-import { MainStatKey, SubstatKey } from "../../Types/artifact";
+import { MainStatKey } from "../../Types/artifact";
 import { allCharacterKeys, ArtifactSetKey, CharacterKey } from "../../Types/consts";
-import { deepClone } from "../../Util/Util";
+import { deepClone, deepFreeze } from "../../Util/Util";
 import { ArtCharDatabase } from "../Database";
 import { DataManager } from "../DataManager";
 
@@ -24,22 +24,18 @@ export interface BuildSetting {
   useEquippedArts: boolean,
   allowPartial: boolean,
   maxBuildsToShow: number,
-  plotBase: MainStatKey | SubstatKey | "",
+  plotBase?: string[],
   compareBuild: boolean,
   levelLow: number,
   levelHigh: number,
 }
 
-export class BuildsettingDataManager extends DataManager<CharacterKey, string, "buildSettings", BuildSetting, BuildSetting>{
+export class BuildSettingDataManager extends DataManager<CharacterKey, "buildSettings", BuildSetting, BuildSetting>{
   constructor(database: ArtCharDatabase) {
     super(database, "buildSettings")
-    for (const key of this.database.storage.keys) {
-      if (key.startsWith("buildSetting_")) {
-        const [, charKey] = key.split("buildSetting_")
-        if (!this.set(charKey as CharacterKey, this.database.storage.get(key)))
-          this.database.storage.remove(key)
-      }
-    }
+    for (const key of this.database.storage.keys)
+      if (key.startsWith("buildSetting_") && !this.set(key.split("buildSetting_")[1] as CharacterKey, {}))
+        this.database.storage.remove(key)
   }
   toStorageKey(key: string): string {
     return `buildSetting_${key}`
@@ -50,16 +46,8 @@ export class BuildsettingDataManager extends DataManager<CharacterKey, string, "
 
     if (typeof statFilters !== "object") statFilters = {}
 
-    if (!mainStatKeys || !mainStatKeys.sands || !mainStatKeys.goblet || !mainStatKeys.circlet) {
-      const tempmainStatKeys = initialBuildSettings().mainStatKeys
-      if (Array.isArray(mainStatKeys)) {
-        const [sands, goblet, circlet] = mainStatKeys
-        if (sands) tempmainStatKeys.sands = [sands]
-        if (goblet) tempmainStatKeys.goblet = [goblet]
-        if (circlet) tempmainStatKeys.circlet = [circlet]
-      }
-      mainStatKeys = tempmainStatKeys
-    }
+    if (!mainStatKeys || !mainStatKeys.sands || !mainStatKeys.goblet || !mainStatKeys.circlet)
+      mainStatKeys = deepClone(initialBuildSettings.mainStatKeys)
 
     if (!optimizationTarget || !Array.isArray(optimizationTarget)) optimizationTarget = undefined
     if (typeof mainStatAssumptionLevel !== "number" || mainStatAssumptionLevel < 0 || mainStatAssumptionLevel > 20)
@@ -67,7 +55,7 @@ export class BuildsettingDataManager extends DataManager<CharacterKey, string, "
     useExcludedArts = !!useExcludedArts
     useEquippedArts = !!useEquippedArts
     if (!maxBuildsToShowList.includes(maxBuildsToShow)) maxBuildsToShow = maxBuildsToShowDefault
-    if (typeof plotBase !== "string") plotBase = ""
+    if (!plotBase || !Array.isArray(plotBase)) plotBase = undefined
     if (compareBuild === undefined) compareBuild = false
     if (levelLow === undefined) levelLow = 0
     if (levelHigh === undefined) levelHigh = 20
@@ -77,16 +65,28 @@ export class BuildsettingDataManager extends DataManager<CharacterKey, string, "
     return { artSetExclusion, statFilters, mainStatKeys, optimizationTarget, mainStatAssumptionLevel, useExcludedArts, useEquippedArts, allowPartial, maxBuildsToShow, plotBase, compareBuild, levelLow, levelHigh }
   }
   get(key: CharacterKey) {
-    const bs = super.get(key)
-    if (bs) return bs
-    const newBs = initialBuildSettings()
-    this.setCached(key, newBs)
-    return newBs
+    return super.get(key) ?? initialBuildSettings
   }
 
   set(key: CharacterKey, value: BuildSettingReducerAction) {
-    const oldState = this.get(key) as BuildSetting
-    return super.set(key, buildSettingsReducer(oldState, value))
+    // TODO:
+    // This is the same code as `super.set` with `buildSettingsReducer`
+    // replacing simple object merging. Refactor so that we don't need
+    // this replication.
+    const old = this.getStorage(key)
+    const validated = this.validate(buildSettingsReducer(old, value), key)
+    if (!validated) {
+      this.trigger(key, "invalid", value)
+      return false
+    }
+    const cached = this.toCache(validated, key)
+    if (!cached) {
+      this.trigger(key, "invalid", value)
+      return false
+    }
+    if (!old) this.trigger(key, "new", cached)
+    this.setCached(key, cached)
+    return true
   }
 }
 type BSMainStatKey = {
@@ -98,7 +98,7 @@ type BSArtSetExclusion = {
 
 export type BuildSettingReducerAction = BSMainStatKey | BSArtSetExclusion | Partial<BuildSetting>
 
-const initialBuildSettings = (): BuildSetting => ({
+const initialBuildSettings: BuildSetting = deepFreeze({
   artSetExclusion: {},
   statFilters: {},
   mainStatKeys: { sands: [], goblet: [], circlet: [] },
@@ -108,13 +108,13 @@ const initialBuildSettings = (): BuildSetting => ({
   useEquippedArts: false,
   allowPartial: false,
   maxBuildsToShow: 5,
-  plotBase: "",
+  plotBase: undefined,
   compareBuild: true,
   levelLow: 0,
   levelHigh: 20,
 })
 
-function buildSettingsReducer(state: BuildSetting = initialBuildSettings(), action: BuildSettingReducerAction): BuildSetting {
+function buildSettingsReducer(state: BuildSetting = initialBuildSettings, action: BuildSettingReducerAction): BuildSetting {
   if ("type" in action) switch (action.type) {
     case 'mainStatKey': {
       const { slotKey, mainStatKey } = action

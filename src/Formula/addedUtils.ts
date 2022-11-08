@@ -6,7 +6,7 @@ import { LinearForm, maxWeight, toLinearUpperBound } from "./linearUpperBound"
 import { foldLikeTerms, ExpandedPolynomial } from "./expandPoly"
 import { ArtifactSetKey } from "../Types/consts"
 import { OptNode } from "./optimization"
-import { ArtSetExclusion } from "../Database/DataManagers/BuildsettingData"
+import { ArtSetExclusion } from "../Database/DataManagers/BuildSettingData"
 
 export function foldSum(nodes: readonly OptNode[]) {
   if (nodes.length === 1) return nodes[0]
