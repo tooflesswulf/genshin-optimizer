@@ -1,6 +1,6 @@
 import { assertUnreachable } from "../Util/Util"
 import { forEachNodes } from "./internal"
-import { constant, sum, prod, threshold, frac } from "./utils"
+import { constant, sum, prod, threshold, frac, max, min } from "./utils"
 import { NumNode, ReadNode } from "./type"
 import { precompute, OptNode } from "./optimization"
 import { DynStat } from "../PageCharacter/CharacterDisplay/Tabs/TabOptimize/common"
@@ -56,6 +56,8 @@ export function ddx(f: OptNode, binding: (readNode: ReadNode<number>) => string,
           assertUnreachable(operation)
           break;
         default:
+          if (operation === "min") return ddx(min(f.operands[0], min(...f.operands.slice(1))), binding, diff)
+          if (operation === "max") return ddx(min(f.operands[0], min(...f.operands.slice(1))), binding, diff)
           throw new Error(`[${operation}] node operates on only 1 or 2 arguments. ${f}`)
       }
       break;
