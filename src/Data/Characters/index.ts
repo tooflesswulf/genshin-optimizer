@@ -16,6 +16,7 @@ import Diluc from './Diluc'
 import Diona from './Diona'
 import Dori from './Dori'
 import Eula from './Eula'
+import Faruzan from './Faruzan'
 import Fischl from './Fischl'
 import Ganyu from './Ganyu'
 import Gorou from './Gorou'
@@ -29,6 +30,7 @@ import Keqing from './Keqing'
 import Klee from './Klee'
 import KujouSara from './KujouSara'
 import KukiShinobu from './KukiShinobu'
+import Layla from './Layla'
 import Lisa from './Lisa'
 import Mona from './Mona'
 import Nahida from './Nahida'
@@ -45,6 +47,7 @@ import Shenhe from "./Shenhe"
 import ShikanoinHeizou from "./ShikanoinHeizou"
 import Sucrose from "./Sucrose"
 import Tartaglia from './Tartaglia'
+import Wanderer from './Wanderer'
 import Thoma from './Thoma'
 import Tighnari from './Tighnari'
 import TravelerAnemoF from './TravelerAnemoF'
@@ -83,6 +86,7 @@ const characters: Record<CharacterSheetKey, CharacterSheet> = {
   Diona,
   Dori,
   Eula,
+  Faruzan,
   Fischl,
   Ganyu,
   Gorou,
@@ -96,6 +100,7 @@ const characters: Record<CharacterSheetKey, CharacterSheet> = {
   Klee,
   KujouSara,
   KukiShinobu,
+  Layla,
   Lisa,
   Mona,
   Nahida,
@@ -112,6 +117,7 @@ const characters: Record<CharacterSheetKey, CharacterSheet> = {
   ShikanoinHeizou,
   Sucrose,
   Tartaglia,
+  Wanderer,
   Thoma,
   Tighnari,
   TravelerAnemoF,

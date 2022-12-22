@@ -1,4 +1,4 @@
-import { CheckBox, CheckBoxOutlineBlank, Close, Science, TrendingUp } from '@mui/icons-material';
+import { CheckBox, CheckBoxOutlineBlank, Close, DeleteForever, Science, TrendingUp } from '@mui/icons-material';
 import { Alert, Box, Button, ButtonGroup, CardContent, Divider, Grid, Link, MenuItem, Skeleton, ToggleButton, Typography, Pagination } from '@mui/material';
 import React, { Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
@@ -13,10 +13,11 @@ import SolidToggleButtonGroup from '../../../../Components/SolidToggleButtonGrou
 import { CharacterContext } from '../../../../Context/CharacterContext';
 import { DataContext, dataContextObj } from '../../../../Context/DataContext';
 import { thresholdExclusions } from '../../../../Formula/addedUtils';
+import { GraphContext } from '../../../../Context/GraphContext';
+import { OptimizationTargetContext } from '../../../../Context/OptimizationTargetContext';
 import { DatabaseContext } from '../../../../Database/Database';
 import { defThreads } from '../../../../Database/DataEntries/DisplayOptimizeEntry';
 import { mergeData, uiDataForTeam } from '../../../../Formula/api';
-import { uiInput as input } from '../../../../Formula/index';
 import { optimize } from '../../../../Formula/optimization';
 import { elimLinDepStats, thresholdToConstBranchForm } from '../../../../Formula/optimize2';
 import { NumNode } from '../../../../Formula/type';
@@ -36,14 +37,14 @@ import AssumeFullLevelToggle from './Components/AssumeFullLevelToggle';
 import BonusStatsCard from './Components/BonusStatsCard';
 import BuildAlert, { BuildStatus } from './Components/BuildAlert';
 import BuildDisplayItem from './Components/BuildDisplayItem';
-import ChartCard, { ChartData } from './Components/ChartCard';
+import ChartCard from './Components/ChartCard';
 import MainStatSelectionCard from './Components/MainStatSelectionCard';
 import OptimizationTargetSelector from './Components/OptimizationTargetSelector';
 import StatFilterCard from './Components/StatFilterCard';
 import UseEquipped from './Components/UseEquipped';
 import UseExcluded from './Components/UseExcluded';
+import WorkerErr from './Components/WorkerErr';
 import { compactArtifacts, dynamicData } from './foreground';
-import { OptimizationTargetContext } from '../../../../Context/OptimizationTargetContext';
 import { countBuildsU, problemSetup, SubProblem, toArtifactBySlotVec } from './subproblemUtil';
 import CardDark from '../../../../Components/Card/CardDark';
 import useBuildResult from './useBuildResult';
@@ -53,11 +54,10 @@ export default function TabBuild() {
   const { t } = useTranslation("page_character_optimize")
   const { character: { key: characterKey, compareData } } = useContext(CharacterContext)
   const { database } = useContext(DatabaseContext)
+  const { setChartData, graphBuilds, setGraphBuilds } = useContext(GraphContext)
 
   const [buildStatus, setBuildStatus] = useState({ type: "inactive", tested: 0, failed: 0, skipped: 0, total: 0 } as BuildStatus)
   const generatingBuilds = buildStatus.type !== "inactive"
-
-  const [chartData, setchartData] = useState(undefined as ChartData | undefined)
 
   const [artsDirty, setArtsDirty] = useForceUpdate()
 
@@ -70,6 +70,11 @@ export default function TabBuild() {
   const characterDispatch = useCharacterReducer(characterKey)
   const onClickTeammate = useCharSelectionCallback()
 
+  // Clear state when changing characters
+  useEffect(() => {
+    setBuildStatus({ type: "inactive", tested: 0, failed: 0, skipped: 0, total: 0 })
+  }, [characterKey])
+
   const noArtifact = useMemo(() => !database.arts.values.length, [database])
 
   const { buildSetting, buildSettingDispatch } = useBuildSetting(characterKey)
@@ -77,6 +82,7 @@ export default function TabBuild() {
   const { buildResult: { builds, buildDate }, buildResultDispatch } = useBuildResult(characterKey)
   const teamData = useTeamData(characterKey, mainStatAssumptionLevel)
   const { characterSheet, target: data } = teamData?.[characterKey as CharacterKey] ?? {}
+  const optimizationTargetNode = optimizationTarget && objPathValue(data?.getDisplay(), optimizationTarget)
   const isSM = ["xs", "sm"].includes(useMediaQueryUp())
 
   //register changes in artifact database
@@ -88,6 +94,7 @@ export default function TabBuild() {
   const cancelToken = useRef(() => { })
   //terminate worker when component unmounts
   useEffect(() => () => cancelToken.current(), [])
+  const [workerErr, setWorkerErr] = useState(false)
   const generateBuilds = useCallback(async () => {
     const { artSetExclusion, plotBase, statFilters, mainStatKeys, optimizationTarget, mainStatAssumptionLevel, useExcludedArts, useEquippedArts, allowPartial, maxBuildsToShow, levelLow, levelHigh } = buildSetting
     if (!characterKey || !optimizationTarget) return
@@ -122,12 +129,20 @@ export default function TabBuild() {
     let unoptimizedOptimizationTargetNode = objPathValue(workerData.display ?? {}, optimizationTarget) as NumNode | undefined
     if (!unoptimizedOptimizationTargetNode) return
     const targetNode = unoptimizedOptimizationTargetNode
-    const valueFilter: { value: NumNode, minimum: number }[] = Object.entries(statFilters).map(([key, value]) => {
-      if (key.endsWith("_")) value = value / 100 // TODO: Conversion
-      return { value: input.total[key], minimum: value }
-    }).filter(x => x.value && x.minimum > -Infinity)
+    const valueFilter: { value: NumNode, minimum: number }[] = Object.entries(statFilters)
+      .flatMap(([pathStr, settings]) =>
+        settings
+          .filter(setting => !setting.disabled)
+          .map(setting => {
+            const filterNode: NumNode = objPathValue(workerData.display ?? {}, JSON.parse(pathStr))
+            const minimum = filterNode.info?.unit === "%" ? setting.value / 100 : setting.value // TODO: Conversion
+            return { value: filterNode, minimum: minimum }
+          })
+      )
+      .filter(x => x.value && x.minimum > -Infinity)
 
-    setchartData(undefined)
+    setChartData(undefined)
+
     const cancelled = new Promise<void>(r => cancelToken.current = r)
 
     let unoptimizedNodes = [...valueFilter.map(x => x.value), unoptimizedOptimizationTargetNode], arts = split!
@@ -135,8 +150,9 @@ export default function TabBuild() {
 
     const minimum = [...valueFilter.map(x => x.minimum), -Infinity]
     const status: Omit<BuildStatus, "type"> = { tested: 0, failed: 0, skipped: 0, total: NaN, startTime: performance.now() }
-    if (plotBase) {
-      unoptimizedNodes.push(objPathValue(workerData.display ?? {}, plotBase))
+    const plotBaseNumNode: NumNode = plotBase && objPathValue(workerData.display ?? {}, plotBase)
+    if (plotBaseNumNode) {
+      unoptimizedNodes.push(plotBaseNumNode)
       minimum.push(-Infinity)
     }
 
@@ -154,7 +170,7 @@ export default function TabBuild() {
     ({ a: arts, nodes } = elimLinDepStats(arts, nodes));
     nodes = optimize(nodes, {}, _ => false)
 
-    const plotBaseNode = plotBase ? nodes.pop() : undefined
+    const plotBaseNode = plotBaseNumNode ? nodes.pop() : undefined
     let optimizationTargetNode = nodes.pop()!
 
     const artSetExclFull = objectKeyValueMap(Object.entries(artSetExclusion), ([setKey, v]) => {
@@ -202,6 +218,11 @@ export default function TabBuild() {
     for (let i = 0; i < maxWorkers; i++) {
       const worker = new Worker(new URL('./BackgroundWorker.ts', import.meta.url))
       workers.push(worker)
+      worker.addEventListener("error", _ => {
+        console.error("Failed to load worker")
+        setWorkerErr(true)
+        cancelToken.current()
+      });
 
       const setup: Setup = {
         command: "setup",
@@ -220,6 +241,7 @@ export default function TabBuild() {
       let finalize: (_: FinalizeResult) => void
       const finalized = new Promise<FinalizeResult>(r => finalize = r)
       worker.onmessage = async ({ data }: { data: { id: number } & WorkerResult }) => {
+        setWorkerErr(false)
         switch (data.command) {
           case "interim":
             status.tested += data.tested
@@ -306,17 +328,16 @@ export default function TabBuild() {
       status.skipped = 0
       status.total = 0
     } else {
-      if (plotBase) {
+      if (plotBaseNumNode) {
         const plotData = mergePlot(results.map(x => x.plotData!))
-        const plotBaseNode = objPathValue(workerData.display ?? {}, plotBase) as NumNode
         let data = Object.values(plotData)
         if (targetNode.info?.unit === "%")
-          data = data.map(({ value, plot }) => ({ value: value * 100, plot })) as Build[]
-        if (plotBaseNode.info?.unit === "%")
-          data = data.map(({ value, plot }) => ({ value, plot: (plot ?? 0) * 100 })) as Build[]
-        setchartData({
+          data = data.map(({ value, plot, artifactIds }) => ({ value: value * 100, plot, artifactIds })) as Build[]
+        if (plotBaseNumNode.info?.unit === "%")
+          data = data.map(({ value, plot, artifactIds }) => ({ value, plot: (plot ?? 0) * 100, artifactIds })) as Build[]
+        setChartData({
           valueNode: targetNode,
-          plotNode: plotBaseNode,
+          plotNode: plotBaseNumNode,
           data
         })
       }
@@ -325,14 +346,14 @@ export default function TabBuild() {
       buildResultDispatch({ builds: builds.map(build => build.artifactIds), buildDate: Date.now() })
     }
     setBuildStatus({ ...status, type: "inactive", finishTime: performance.now() })
-  }, [characterKey, database, buildResultDispatch, maxWorkers, buildSetting, equipmentPriority])
+  }, [characterKey, database, buildResultDispatch, maxWorkers, buildSetting, equipmentPriority, setChartData])
 
   const characterName = characterSheet?.name ?? "Character Name"
 
   const setPlotBase = useCallback(plotBase => {
     buildSettingDispatch({ plotBase })
-    setchartData(undefined)
-  }, [buildSettingDispatch])
+    setChartData(undefined)
+  }, [buildSettingDispatch, setChartData])
   const dataContext: dataContextObj | undefined = useMemo(() => {
     return data && teamData && { data, teamData }
   }, [data, teamData])
@@ -392,7 +413,7 @@ export default function TabBuild() {
             onClick={() => buildSettingDispatch({ allowPartial: !allowPartial })}
             disabled={generatingBuilds}
           >
-              {t`allowPartial`}
+            {t`allowPartial`}
           </Button>
           { /* Level Filter */}
           <CardLight>
@@ -452,34 +473,34 @@ export default function TabBuild() {
         <BootstrapTooltip placement="top" title={!optimizationTarget ? t("selectTargetFirst") : ""}>
           <span>
             <Button
-              disabled={!characterKey || !optimizationTarget || !objPathValue(data?.getDisplay(), optimizationTarget)}
+              disabled={!characterKey || !optimizationTarget || !optimizationTargetNode || optimizationTargetNode.isEmpty}
               color={generatingBuilds ? "error" : "success"}
               onClick={generatingBuilds ? () => cancelToken.current() : generateBuilds}
               startIcon={generatingBuilds ? <Close /> : <TrendingUp />}
               sx={{ borderRadius: "0px 4px 4px 0px" }}
-            >{generatingBuilds ? "Cancel" : "Generate Builds"}</Button>
+            >{generatingBuilds ? t("generateButton.cancel") : t("generateButton.generateBuilds")}</Button>
           </span>
         </BootstrapTooltip>
       </ButtonGroup>
-
+      {workerErr && <WorkerErr />}
       {!!characterKey && <BuildAlert {...{ status: buildStatus, characterName, maxBuildsToShow }} />}
       <Box >
-        <ChartCard disabled={generatingBuilds || !optimizationTarget} chartData={chartData} plotBase={plotBase} setPlotBase={setPlotBase} showTooltip={!optimizationTarget} />
+        <ChartCard disabled={generatingBuilds || !optimizationTarget} plotBase={plotBase} setPlotBase={setPlotBase} showTooltip={!optimizationTarget} />
       </Box>
       <CardLight>
         <CardContent>
           <Box display="flex" alignItems="center" gap={1} mb={1} >
             <Typography sx={{ flexGrow: 1 }}>
-              {builds ? <span>Showing <strong>{builds.length}</strong> Builds generated for {characterName}. {!!buildDate && <span>Build generated on: <strong>{(new Date(buildDate)).toLocaleString()}</strong></span>}</span>
+              {builds ? <span>Showing <strong>{builds.length + (graphBuilds ? graphBuilds.length : 0)}</strong> build generated for {characterName}. {!!buildDate && <span>Build generated on: <strong>{(new Date(buildDate)).toLocaleString()}</strong></span>}</span>
                 : <span>Select a character to generate builds.</span>}
             </Typography>
-            <Button disabled={!builds.length} color="error" onClick={() => buildResultDispatch({ builds: [], buildDate: 0 })} >Clear Builds</Button>
+            <Button disabled={!builds.length} color="error" onClick={() => { setGraphBuilds(undefined); buildResultDispatch({ builds: [], buildDate: 0 }) }} >Clear Builds</Button>
           </Box>
           <Grid container display="flex" spacing={1}>
             <Grid item><HitModeToggle size="small" /></Grid>
             <Grid item><ReactionToggle size="small" /></Grid>
             <Grid item flexGrow={1} />
-            <Grid item><SolidToggleButtonGroup exclusive value={compareData} onChange={(e, v) => characterDispatch({ compareData: v })} size="small">
+            <Grid item><SolidToggleButtonGroup exclusive value={compareData} onChange={(_e, v) => characterDispatch({ compareData: v })} size="small">
               <ToggleButton value={false} disabled={!compareData}>Show new builds</ToggleButton>
               <ToggleButton value={true} disabled={compareData}>Compare vs. equipped</ToggleButton>
             </SolidToggleButtonGroup></Grid>
@@ -488,20 +509,30 @@ export default function TabBuild() {
       </CardLight>
 
       <OptimizationTargetContext.Provider value={optimizationTarget}>
-        <BuildList builds={builds} characterKey={characterKey} data={data} compareData={compareData} disabled={!!generatingBuilds} />
+        {graphBuilds && <BuildList builds={graphBuilds} characterKey={characterKey} data={data} compareData={compareData} disabled={!!generatingBuilds} getLabel={(index) => <Trans t={t} i18nKey="graphBuildLabel" count={index + 1}>Graph #{{count: index + 1}}</Trans>} setBuilds={setGraphBuilds} />}
+        <BuildList builds={builds} characterKey={characterKey} data={data} compareData={compareData} disabled={!!generatingBuilds} getLabel={(index) => `#${index + 1}`} />
       </OptimizationTargetContext.Provider>
     </DataContext.Provider>}
   </Box>
 }
-
 const maxArtsToShowPerPage = 5
-function BuildList({ builds, characterKey, data, compareData, disabled }: {
-  builds: string[][],
-  characterKey?: "" | CharacterKey,
-  data?: UIData,
-  compareData: boolean,
-  disabled: boolean,
+function BuildList({ builds, setBuilds, characterKey, data, compareData, disabled, getLabel }: {
+  builds: string[][]
+  setBuilds?: (builds: string[][] | undefined) => void
+  characterKey?: "" | CharacterKey
+  data?: UIData
+  compareData: boolean
+  disabled: boolean
+  getLabel: (index: number) => Displayable
 }) {
+  const deleteBuild = useCallback((index: number) => {
+    if (setBuilds) {
+      const builds_ = [...builds]
+      builds_.splice(index, 1)
+      setBuilds(builds_)
+    }
+  },
+  [builds, setBuilds])
   // Memoize the build list because calculating/rendering the build list is actually very expensive, which will cause longer optimization times.
   const list = useMemo(() => <Suspense fallback={<Skeleton variant="rectangular" width="100%" height={600} />}>
     {builds?.map((build, index) => characterKey && data && <DataContextWrapper
@@ -510,18 +541,21 @@ function BuildList({ builds, characterKey, data, compareData, disabled }: {
       build={build}
       oldData={data}
     >
-      <BuildItemWrapper index={index} build={build} compareData={compareData} disabled={disabled} />
+      <BuildItemWrapper index={index} label={getLabel(index)} build={build} compareData={compareData} disabled={disabled} deleteBuild={setBuilds ? deleteBuild : undefined} />
     </DataContextWrapper>
     )}
-  </Suspense>, [builds, characterKey, data, compareData, disabled])
+  </Suspense>, [builds, characterKey, data, compareData, disabled, getLabel, deleteBuild, setBuilds])
   return list
 }
-function BuildItemWrapper({ index, build, compareData, disabled }: {
+function BuildItemWrapper({ index, label, build, compareData, disabled, deleteBuild }: {
   index: number
-  build: string[],
-  compareData: boolean,
-  disabled: boolean,
+  label: Displayable
+  build: string[]
+  compareData: boolean
+  disabled: boolean
+  deleteBuild?: (index: number) => void
 }) {
+  const { t } = useTranslation("page_character_optimize")
   const location = useLocation()
   const navigate = useNavigate()
   const toTC = useCallback(() => {
@@ -530,8 +564,12 @@ function BuildItemWrapper({ index, build, compareData, disabled }: {
     navigate(`${paths.join("/")}/theorycraft`, { state: { build } })
   }, [navigate, build, location.pathname])
 
-  return <BuildDisplayItem index={index} compareBuild={compareData} disabled={disabled}
-    extraButtonsLeft={<Button color="info" size="small" startIcon={<Science />} onClick={toTC}>Theorycraft</Button>} />
+  return <BuildDisplayItem label={label} compareBuild={compareData} disabled={disabled}
+    extraButtonsLeft={<>
+      <Button color="info" size="small" startIcon={<Science />} onClick={toTC}>{t("theorycraftButton")}</Button>
+      {deleteBuild && <Button color="error" size="small" startIcon={<DeleteForever />} onClick={() => deleteBuild(index)}>{t("removeBuildButton")}</Button>}
+    </>}
+  />
 }
 
 type Prop = {

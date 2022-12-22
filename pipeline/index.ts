@@ -81,6 +81,8 @@ export const characterIdMap = {
   10000072: "Candace",
   10000073: "Nahida",
   10000074: "Layla",
+  10000075: "Wanderer",
+  10000076: "Faruzan",
   // 11000008: "TEMPLATE",
   // 11000009: "TEMPLATE",
   // 11000010: "TEMPLATE",
@@ -123,6 +125,10 @@ export const weaponIdMap = {
   11416: "KagotsurubeIsshin",
   11417: "SapwoodBlade",
   11418: "XiphosMoonlight",
+  // 11419: "",
+  // 11420: "",
+  // 11421: "",
+  11422: "ToukabouShigure",
   11501: "AquilaFavonia",
   11502: "SkywardBlade",
   11503: "FreedomSworn",
@@ -235,7 +241,9 @@ export const weaponIdMap = {
   // 14506: "Diamond Visage",
   // 14508: "",
   14509: "KagurasVerity",
+  // 14510: "",
   14511: "AThousandFloatingDreams",
+  14512: "TulaytullahsRemembrance",
 
   //bow
   15101: "HuntersBow",
@@ -331,6 +339,8 @@ export const artifactIdMap = {
   15024: "EchoesOfAnOffering",
   15025: "DeepwoodMemories",
   15026: "GildedDreams",
+  15027: "DesertPavilionChronicle",
+  15028: "FlowerOfParadiseLost",
 } as const
 
 export const artifactSlotMap = {

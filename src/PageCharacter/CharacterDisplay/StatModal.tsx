@@ -1,5 +1,4 @@
-import { CardContent, CardHeader, Grid, ListItem, Stack, Typography } from "@mui/material";
-import { Box } from "@mui/system";
+import { CardContent, CardHeader, Grid, ListItem, Stack, Typography, Box } from "@mui/material";
 import { useCallback, useContext, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import CardDark from "../../Components/Card/CardDark";
@@ -36,7 +35,7 @@ export default function StatModal({ open, onClose }) {
   </ModalWrapper>
 }
 const keys = [...allInputPremodKeys]
-const wrapperFunc = (e: JSX.Element) => <Grid item xs={1}>{e}</Grid>
+const wrapperFunc = (e: JSX.Element, key?: string) => <Grid item key={key} xs={1}>{e}</Grid>
 function BonusStatsEditor() {
   const { character: { bonusStats }, characterDispatch } = useContext(CharacterContext)
   const setFilter = useCallback((bonusStats) => characterDispatch({ bonusStats }), [characterDispatch],)

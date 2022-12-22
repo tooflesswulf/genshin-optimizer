@@ -137,10 +137,20 @@ export default function TabUpopt() {
     setArtifactUpgradeOpts(undefined)
     setpageIdex(0)
 
-    const valueFilter: { value: NumNode, minimum: number }[] = Object.entries(statFilters).map(([key, value]) => {
-      if (key.endsWith("_")) value = value / 100
-      return { value: input.total[key], minimum: value }
-    }).filter(x => x.value && x.minimum > -Infinity)
+    const valueFilter: { value: NumNode, minimum: number }[] = Object.entries(statFilters)
+      .flatMap(([pathStr, settings]) =>
+        settings
+          .filter(setting => !setting.disabled)
+          .map(setting => {
+            const filterNode: NumNode = objPathValue(workerData.display ?? {}, JSON.parse(pathStr))
+            const minimum = filterNode.info?.unit === "%" ? setting.value / 100 : setting.value
+            return { value: filterNode, minimum }
+          })
+      )
+    // const valueFilter: { value: NumNode, minimum: number }[] = Object.entries(statFilters).map(([key, value]) => {
+    //   if (key.endsWith("_")) value = value / 100
+    //   return { value: input.total[key], minimum: value }
+    // }).filter(x => x.value && x.minimum > -Infinity)
 
     const equippedArts = database.chars.get(characterKey)?.equippedArtifacts ?? {} as StrictDict<SlotKey, string>
     const curEquip: QueryBuild = objectKeyMap(allSlotKeys, slotKey => {

@@ -1,11 +1,11 @@
 import { CharacterData } from 'pipeline'
 import { input } from "../../../Formula/index"
-import { constant, equal, greaterEq, infoMut, min, one, percent, prod, subscript, sum } from "../../../Formula/utils"
+import { compareEq, constant, equal, greaterEq, infoMut, min, one, percent, prod, subscript, sum } from "../../../Formula/utils"
 import KeyMap from '../../../KeyMap'
 import { CharacterKey, ElementKey } from '../../../Types/consts'
-import { cond, stg } from '../../SheetUtil'
+import { cond, st, stg } from '../../SheetUtil'
 import CharacterSheet, { charTemplates, ICharacterSheet } from '../CharacterSheet'
-import { customDmgNode, customHealNode, dataObjForCharacterSheet, dmgNode } from '../dataUtil'
+import { customHealNode, dataObjForCharacterSheet, dmgNode } from '../dataUtil'
 import assets from './assets'
 import data_gen_src from './data_gen.json'
 import skillParam_gen from './skillParam_gen.json'
@@ -56,10 +56,10 @@ const dm = {
   },
   constellation2: {
     hydro_enemyRes_: -0.15,
-    skill_duration: 3
+    burst_duration: 3
   },
   constellation4: {
-    dmg_: 0.50
+    dmg_: 1.50
   },
 } as const
 
@@ -72,8 +72,13 @@ const nodeC2 = greaterEq(input.constellation, 2,
 const [condSkillPath, condSkill] = cond(key, "skill")
 
 const [condBurstPath, condBurst] = cond(key, "burst")
-const nodeC4 = greaterEq(input.constellation, 4,
-  equal(condBurst, "on", dm.constellation4.dmg_), { name: ct.ch("c4dmg_"), unit: "%" })
+const nodeC4 = compareEq(
+  greaterEq(input.constellation, 4, equal(condBurst, "on", 1)),
+  1,
+  dm.constellation4.dmg_,
+  one,
+  { name: st("dmgMult.skill"), unit: "%" }
+)
 
 const nodeSkillDmgRed_ = equal(condSkill, "on",
   sum(subscript(input.total.skillIndex, dm.skill.dmgRed_, { unit: "%" }), min(percent(0.24), prod(percent(0.2), input.premod.hydro_dmg_))))
@@ -90,17 +95,8 @@ export const dmgFormulas = {
   plunging: Object.fromEntries(Object.entries(dm.plunging).map(([key, value]) =>
     [key, dmgNode("atk", value, "plunging")])),
   skill: {
-    // Multiplicative DMG increase requires customDmgNode
-    press1: customDmgNode(prod(
-      subscript(input.total.skillIndex, dm.skill.hit1, { unit: "%" }),
-      input.total.atk,
-      sum(one, nodeC4)
-    ), "skill"),
-    press2: customDmgNode(prod(
-      subscript(input.total.skillIndex, dm.skill.hit2, { unit: "%" }),
-      input.total.atk,
-      sum(one, nodeC4)
-    ), "skill"),
+    press1: dmgNode("atk", dm.skill.hit1, "skill", undefined, nodeC4),
+    press2: dmgNode("atk", dm.skill.hit2, "skill", undefined, nodeC4),
     dmgRed_: nodeSkillDmgRed_,
   },
   passive1: {
@@ -175,9 +171,7 @@ const sheet: ICharacterSheet = {
         node: infoMut(dmgFormulas.skill.press2, { name: ct.chg(`skill.skillParams.0`), textSuffix: "(2)" }),
       }, {
         text: ct.chg("skill.skillParams.2"),
-        value: data => data.get(input.constellation).value >= 2
-          ? `${dm.skill.duration}s + ${dm.constellation2.skill_duration}`
-          : `${dm.skill.duration}`,
+        value: dm.skill.duration,
         unit: "s"
       }, {
         text: ct.chg("skill.skillParams.3"),
@@ -217,7 +211,9 @@ const sheet: ICharacterSheet = {
             node: infoMut(dmgFormulas.burst.dmg, { name: ct.chg(`burst.skillParams.0`) }),
           }, {
             text: ct.chg("burst.skillParams.1"),
-            value: dm.burst.duration,
+            value: data => data.get(input.constellation).value >= 2
+              ? `${dm.burst.duration}s + ${dm.constellation2.burst_duration}s = ${dm.burst.duration + dm.constellation2.burst_duration}`
+              : `${dm.burst.duration}`,
             unit: "s"
           }, {
             node: nodeC4
