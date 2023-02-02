@@ -241,17 +241,29 @@ export default function TabBuild() {
       .map((value, i) => ({ value, min: minimum[i] }))
       .filter(x => x.min > -Infinity)
 
-    // console.log('=========== TEST SOLVER BASE ===========')
-    // const setup2: OptProblemInput = {
-    //   arts, optimizationTarget: optimizationTargetNode,
-    //   constraints: filters, artSet: artSetExclusion,
-
-    //   topN: maxBuildsToShow, plotBase: plotBaseNode,
-    //   numWorkers: maxWorkers,
-    //   url: import.meta.url,
+    console.log('=========== TEST SOLVER BASE ===========')
+    // const urlbad = new URL('../../../../Solver/TestWorker.ts', import.meta.url)
+    // const wkrk = new Worker(new URL('./BackgroundWorker.ts', import.meta.url))
+    // const wkrk = new Worker(new URL('../../../../Solver/TestWorker.ts', import.meta.url))
+    // const setup0: Setup = {
+    //   command: "setup",
+    //   id: 55, arts,
+    //   optimizationTarget: optimizationTargetNode,
+    //   plotBase: plotBaseNode,
+    //   maxBuilds: maxBuildsToShow,
+    //   filters
     // }
-    // testSolverBase(setup2)
-    // console.log('=========== END TEST SOLVER BASE ===========')
+    // wkrk.postMessage(setup0)
+
+    const setup2: OptProblemInput = {
+      arts, optimizationTarget: optimizationTargetNode,
+      constraints: filters, artSet: artSetExclusion,
+
+      topN: maxBuildsToShow, plotBase: plotBaseNode,
+      numWorkers: maxWorkers,
+    }
+    testSolverBase(setup2)
+    console.log('=========== END TEST SOLVER BASE ===========')
 
 
     const finalizedList: Promise<FinalizeResult>[] = []

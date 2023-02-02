@@ -11,8 +11,6 @@ export type OptProblemInput = {
   topN: number,
   plotBase?: OptNode,
   numWorkers: number,
-
-  url: string,
 }
 
 export abstract class SolverBase<Message_t> {
@@ -20,8 +18,6 @@ export abstract class SolverBase<Message_t> {
   protected opt: OptNode;
   protected constraints: { value: OptNode, min: number }[];
 
-  abstract workerURL: string;
-  protected url: string;
   protected numWorkers: number;
   protected workers: Worker[] = [];
 
@@ -33,7 +29,6 @@ export abstract class SolverBase<Message_t> {
     this.opt = input.optimizationTarget
     this.constraints = input.constraints
     this.numWorkers = input.numWorkers
-    this.url = input.url
   }
 
   preprocess() {
@@ -49,10 +44,11 @@ export abstract class SolverBase<Message_t> {
     // Automatically retrieve solutions & return them
   }
 
+  protected abstract makeWorker(): Worker
   private spawnWorkers() {
     // Handle spawning workers
     for (let i = 0; i < this.numWorkers; i++) {
-      const worker = new Worker(new URL(this.workerURL, this.url))
+      const worker = this.makeWorker()
       worker.addEventListener("error", this.onWorkerFail);
 
       this.workers.push(worker)
@@ -66,8 +62,7 @@ export abstract class SolverBase<Message_t> {
 }
 
 class TestSolver extends SolverBase<number> {
-  workerURL = './BackgroundWorker.ts';
-
+  protected makeWorker(): Worker { return new Worker(new URL('./TestWorker.ts', import.meta.url)) }
   protected startWorkers(): void {
     for (let i = 0; i < this.numWorkers; i++) {
       this.workers[i].postMessage(i)
@@ -84,6 +79,8 @@ class TestSolver extends SolverBase<number> {
 
 export function testSolverBase(inp: OptProblemInput) {
   const ts = new TestSolver(inp)
-
   ts.solve()
+
+  const wkrk = new Worker(new URL('./TestWorker.ts', import.meta.url))
+  wkrk.postMessage(42)
 }
