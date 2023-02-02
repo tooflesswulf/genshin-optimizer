@@ -48,15 +48,23 @@ import WorkerErr from './Components/WorkerErr';
 import { compactArtifacts, dynamicData } from './foreground';
 import useBuildResult from './useBuildResult';
 import useBuildSetting from './useBuildSetting';
+import NotificationsOffIcon from '@mui/icons-material/NotificationsOff';
+import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 
 import { OptProblemInput, testSolverBase } from '../../../../Solver/SolverBase';
 
+const audio = new Audio("notification.mp3")
 export default function TabBuild() {
   const { t } = useTranslation("page_character_optimize")
   const { character: { key: characterKey, compareData } } = useContext(CharacterContext)
   const { database } = useContext(DatabaseContext)
   const { setChartData, graphBuilds, setGraphBuilds } = useContext(GraphContext)
   const { gender } = useDBMeta()
+
+  const [notification, setnotification] = useState(false)
+  const notificationRef = useRef(false)
+  useEffect(() => { notificationRef.current = notification }, [notification])
+
 
   const [buildStatus, setBuildStatus] = useState({ type: "inactive", tested: 0, failed: 0, skipped: 0, total: 0 } as BuildStatus)
   const generatingBuilds = buildStatus.type !== "inactive"
@@ -130,6 +138,18 @@ export default function TabBuild() {
     })
     return `${current}/${total}`
   }, [deferredBuildSetting, filteredArtIds, database])
+
+  const tabFocused = useRef(true)
+  useEffect(() => {
+    const onFocus = () => tabFocused.current = true
+    const onBlur = () => tabFocused.current = false
+    window.addEventListener('focus', onFocus)
+    window.addEventListener('blur', onBlur)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      window.removeEventListener('blur', onBlur)
+    }
+  }, [tabFocused])
 
   // Provides a function to cancel the work
   const cancelToken = useRef(() => { })
@@ -284,6 +304,16 @@ export default function TabBuild() {
           case "finalize":
             worker.terminate()
             finalize(data);
+
+            // Using a timeout because when an alert is displayed, the UI doesnt update, showing an incomplete loading bar
+            setTimeout(() => {
+              // Using a ref because a user can cancel the notification while the build is going.
+              if (notificationRef.current) {
+                audio.play()
+                if (!tabFocused.current)
+                  window.alert(t`buildCompleted`)
+              }
+            }, 100);
             return
           case "count":
             const [pruned, prepruned] = data.counts
@@ -348,7 +378,7 @@ export default function TabBuild() {
       buildResultDispatch({ builds: builds.map(build => build.artifactIds), buildDate: Date.now() })
     }
     setBuildStatus({ ...status, type: "inactive", finishTime: performance.now() })
-  }, [characterKey, filteredArts, database, buildResultDispatch, maxWorkers, buildSetting, setChartData])
+  }, [t, characterKey, filteredArts, database, buildResultDispatch, maxWorkers, buildSetting, notificationRef, setChartData, gender])
 
   const characterName = characterSheet?.name ?? "Character Name"
 
@@ -472,6 +502,11 @@ export default function TabBuild() {
             </Trans>
           </MenuItem>)}
         </DropdownButton>
+        <BootstrapTooltip placement="top" title={t`notifyTooltip`}>
+          <Button sx={{ borderRadius: 0 }} color='warning' onClick={() => setnotification(n => !n)} >
+            {notification ? <NotificationsActiveIcon /> : <NotificationsOffIcon />}
+          </Button>
+        </BootstrapTooltip>
         <BootstrapTooltip placement="top" title={!optimizationTarget ? t("selectTargetFirst") : ""}>
           <span>
             <Button
