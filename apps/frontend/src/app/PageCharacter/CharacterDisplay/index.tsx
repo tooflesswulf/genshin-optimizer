@@ -31,6 +31,7 @@ import TabOverview from './Tabs/TabOverview';
 import TabTalent from './Tabs/TabTalent';
 import TabTeambuffs from './Tabs/TabTeambuffs';
 import TabTheorycraft from './Tabs/TabTheorycraft';
+import TabUpopt from './Tabs/TabUpgradeOpt';
 import TravelerElementSelect from './TravelerElementSelect';
 import TravelerGenderSelect from './TravelerGenderSelect';
 
@@ -145,6 +146,7 @@ function CharacterPanel() {
       <Route path="/teambuffs" element={<TabTeambuffs />} />
       <Route path="/optimize" element={<TabBuild />} />
       <Route path="/theorycraft" element={<TabTheorycraft />} />
+      <Route path="/upopt" element={<TabUpopt />} />
     </Routes>
   </Suspense>
 }
@@ -161,11 +163,12 @@ function TabNav({ tab }: { tab: string }) {
       },
     }}
   >
-    <Tab sx={{ minWidth: "20%" }} value="overview" label={t("tabs.overview")} icon={<Person />} component={RouterLink} to="" />
-    <Tab sx={{ minWidth: "20%" }} value="talent" label={t("tabs.talent")} icon={<FactCheck />} component={RouterLink} to="talent" />
-    <Tab sx={{ minWidth: "20%" }} value="teambuffs" label={t("tabs.teambuffs")} icon={<Groups />} component={RouterLink} to="teambuffs" />
-    <Tab sx={{ minWidth: "20%" }} value="optimize" label={t("tabs.optimize")} icon={<TrendingUp />} component={RouterLink} to="optimize" />
-    <Tab sx={{ minWidth: "20%" }} value="theorycraft" label={t("tabs.theorycraft")} icon={<Science />} component={RouterLink} to="theorycraft" />
+    <Tab sx={{ minWidth: "15%" }} value="overview" label={t("tabs.overview")} icon={<Person />} component={RouterLink} to="" />
+    <Tab sx={{ minWidth: "15%" }} value="talent" label={t("tabs.talent")} icon={<FactCheck />} component={RouterLink} to="talent" />
+    <Tab sx={{ minWidth: "15%" }} value="teambuffs" label={t("tabs.teambuffs")} icon={<Groups />} component={RouterLink} to="teambuffs" />
+    <Tab sx={{ minWidth: "15%" }} value="optimize" label={t("tabs.optimize")} icon={<TrendingUp />} component={RouterLink} to="optimize" />
+    <Tab sx={{ minWidth: "15%" }} value="theorycraft" label={t("tabs.theorycraft")} icon={<Science />} component={RouterLink} to="theorycraft" />
+    <Tab sx={{ minWidth: "15%" }} value="upopt" label={t("tabs.upgradeopt")} icon={<Science />} component={RouterLink} to="upopt" />
   </Tabs>
 }
 
