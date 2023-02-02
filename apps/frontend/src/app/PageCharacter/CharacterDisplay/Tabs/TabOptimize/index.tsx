@@ -49,6 +49,8 @@ import { compactArtifacts, dynamicData } from './foreground';
 import useBuildResult from './useBuildResult';
 import useBuildSetting from './useBuildSetting';
 
+import { OptProblemInput, testSolverBase } from '../../../../Solver/SolverBase';
+
 export default function TabBuild() {
   const { t } = useTranslation("page_character_optimize")
   const { character: { key: characterKey, compareData } } = useContext(CharacterContext)
@@ -218,6 +220,19 @@ export default function TabBuild() {
     const filters = nodes
       .map((value, i) => ({ value, min: minimum[i] }))
       .filter(x => x.min > -Infinity)
+
+    // console.log('=========== TEST SOLVER BASE ===========')
+    // const setup2: OptProblemInput = {
+    //   arts, optimizationTarget: optimizationTargetNode,
+    //   constraints: filters, artSet: artSetExclusion,
+
+    //   topN: maxBuildsToShow, plotBase: plotBaseNode,
+    //   numWorkers: maxWorkers,
+    //   url: import.meta.url,
+    // }
+    // testSolverBase(setup2)
+    // console.log('=========== END TEST SOLVER BASE ===========')
+
 
     const finalizedList: Promise<FinalizeResult>[] = []
     for (let i = 0; i < maxWorkers; i++) {
