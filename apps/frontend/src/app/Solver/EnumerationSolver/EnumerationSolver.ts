@@ -1,7 +1,7 @@
 import { ArtSetExclusion } from "../../Database/DataManagers/BuildSettingData";
 import { OptNode } from "../../Formula/optimization";
-import { ArtifactsBySlot, Build, PlotData, RequestFilter } from "../../PageCharacter/CharacterDisplay/Tabs/TabOptimize/common";
-import { SolverBase, SourcedInterimResult, FinalizeResult } from "../SolverBase";
+import { ArtifactsBySlot, Build, PlotData, RequestFilter, artSetPerm, filterFeasiblePerm } from "../../PageCharacter/CharacterDisplay/Tabs/TabOptimize/common";
+import { SolverBase, SourcedInterimResult, FinalizeResult, OptProblemInput } from "../SolverBase";
 
 export class EnumerationSolver extends SolverBase<WorkerCommand, WorkerResult> {
   protected makeWorker(): Worker { return new Worker(new URL('./BackgroundWorker.ts', import.meta.url)) }
@@ -21,6 +21,19 @@ export class EnumerationSolver extends SolverBase<WorkerCommand, WorkerResult> {
 
     const countCommand: WorkerCommand = {command: 'count', exclusion: this.artSetExcl, arts: [this.arts]}
     this.workers[0].postMessage(countCommand)
+  }
+
+  private minFilterCount = 16_000_000
+  private unprunedFilters: Iterator<RequestFilter>
+  private requestFilters: RequestFilter[]
+
+  constructor(input: OptProblemInput) {
+    super(input)
+
+    // Initialization for EnumerationSolver.
+    const setPerms = filterFeasiblePerm(artSetPerm(this.artSetExcl, Object.values(this.arts.values).flatMap(x => x.map(x => x.set!))), split)
+    this.unprunedFilters = setPerms[Symbol.iterator]()
+    this.requestFilters = []
   }
 
   protected ipc(result: WorkerResult): void {
