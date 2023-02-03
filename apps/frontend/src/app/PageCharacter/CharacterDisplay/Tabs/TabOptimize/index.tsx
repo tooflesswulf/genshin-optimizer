@@ -225,7 +225,7 @@ export default function TabBuild() {
       numWorkers: maxWorkers,
     }
     setWorkerErr(false)
-    const solver: EnumerationSolver = new EnumerationSolver(setup2)
+    const solver: SolverBase<unknown, { command: string }> = new EnumerationSolver(setup2)
 
     cancelled.then(() => solver.cancel())
     solver.onWorkerError(_ => {

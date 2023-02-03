@@ -1,7 +1,7 @@
 import { ArtSetExclusion } from "../../Database/DataManagers/BuildSettingData";
 import { OptNode } from "../../Formula/optimization";
 import { ArtifactsBySlot, Build, PlotData, RequestFilter } from "../../PageCharacter/CharacterDisplay/Tabs/TabOptimize/common";
-import { SolverBase, InterimResult, FinalizeResult } from "../SolverBase";
+import { SolverBase, SourcedInterimResult, FinalizeResult } from "../SolverBase";
 
 export class EnumerationSolver extends SolverBase<WorkerCommand, WorkerResult> {
   protected makeWorker(): Worker { return new Worker(new URL('./BackgroundWorker.ts', import.meta.url)) }
@@ -85,8 +85,4 @@ export interface IterateResult {
 export interface CountResult {
   command: "count"
   counts: number[]
-}
-export interface SourcedInterimResult extends InterimResult {
-  /** the source of the message, must be unique for each source of `buildValues` */
-  source: string
 }

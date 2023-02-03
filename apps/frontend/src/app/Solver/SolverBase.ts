@@ -20,6 +20,8 @@ export interface InterimResult {
   tested: number,         // Number of builds since last report (including failed)
   failed: number,         // Number of builds that fail ArtsetExcl or constraints
   skipped: number,
+}
+export interface SourcedInterimResult extends InterimResult {
   source: string,
 }
 export interface FinalizeResult {
@@ -104,14 +106,14 @@ export abstract class SolverBase<Command_t, Result_t extends { command: string }
 
       let finalize: (_: FinalizeResult) => void
       const finalized = new Promise<FinalizeResult>(r => finalize = r)
-      worker.onmessage = async ({ data }: { data: Result_t | InterimResult | FinalizeResult }) => {
+      worker.onmessage = async ({ data }: { data: Result_t | SourcedInterimResult | FinalizeResult }) => {
         switch (data.command) {
           case "finalize":
             worker.terminate()
             finalize(data as FinalizeResult)
             break
           case "interim":
-            this.handleInterim(data as InterimResult)
+            this.handleInterim(data as SourcedInterimResult)
             break
           default:
             this.ipc(data as Result_t, i)
@@ -135,7 +137,7 @@ export abstract class SolverBase<Command_t, Result_t extends { command: string }
   }
 
   // Default communication types
-  protected handleInterim(result: InterimResult) {
+  protected handleInterim(result: SourcedInterimResult) {
     this.computeStatus.tested += result.tested
     this.computeStatus.failed += result.failed
     this.computeStatus.skipped += result.skipped
