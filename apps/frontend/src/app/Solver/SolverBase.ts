@@ -1,6 +1,7 @@
 import { OptNode } from "../Formula/optimization";
-import { ArtifactsBySlot } from "../PageCharacter/CharacterDisplay/Tabs/TabOptimize/common";
+import { ArtifactsBySlot, Build, PlotData } from "../PageCharacter/CharacterDisplay/Tabs/TabOptimize/common";
 import { ArtSetExclusion } from "../Database/DataManagers/BuildSettingData";
+import { BuildStatus } from "../PageCharacter/CharacterDisplay/Tabs/TabOptimize/Components/BuildAlert";
 
 export type OptProblemInput = {
   arts: ArtifactsBySlot,
@@ -13,74 +14,125 @@ export type OptProblemInput = {
   numWorkers: number,
 }
 
-export abstract class SolverBase<Message_t> {
-  protected arts: ArtifactsBySlot | string;
+export interface InterimResult {
+  command: "interim",
+  buildValues?: number[],
+  tested: number,         // Number of builds since last report (including failed)
+  failed: number,         // Number of builds that fail ArtsetExcl or constraints
+  skipped: number,
+}
+export interface FinalizeResult {
+  command: "finalize"
+  builds: Build[]
+  plotData?: PlotData
+}
+
+
+export abstract class SolverBase<Command_t, Result_t extends { command: string }> {
+  protected arts: ArtifactsBySlot;
   protected opt: OptNode;
   protected constraints: { value: OptNode, min: number }[];
+  protected artSetExcl: ArtSetExclusion;
+  protected topN: number;
+  protected plotBase?: OptNode;
 
   protected numWorkers: number;
   protected workers: Worker[] = [];
 
+  computeStatus: Omit<BuildStatus, "type">;
+
+  callOnWorkerError?: (e: ErrorEvent) => void;
+  callOnSuccess?: () => void;
+
   // eslint-disable-next-line @typescript-eslint/no-empty-function
-  onWorkerFail: (e: ErrorEvent) => void = () => { };
+  private doCancel: () => void = () => { };
+  private cancelled: Promise<void>;
+  protected idleWorkers: number[] = [];
+  finalizedList: Promise<FinalizeResult>[] = [];
+  finalizer: ((_: FinalizeResult) => void)[] = []
 
   constructor(input: OptProblemInput) {
     this.arts = input.arts;
     this.opt = input.optimizationTarget
     this.constraints = input.constraints
+    this.artSetExcl = input.artSet
+    this.topN = input.topN
+    this.plotBase = input.plotBase
     this.numWorkers = input.numWorkers
+
+    this.cancelled = new Promise(r => this.doCancel = r)
+    this.computeStatus = { tested: 0, failed: 0, skipped: 0, total: NaN, startTime: performance.now() };
   }
 
   preprocess() {
-    // Automatic pruning goes here.
+    // Common pre-processing steps?
   }
 
-  protected abstract _solveImpl(): void
-  solve() {
+  // Runs the main optimization process
+  cancel() { this.doCancel() }
+  async solve() {
+    this.preprocess()
+
     this.spawnWorkers()
     this.startWorkers()
 
-    this._solveImpl()
     // Automatically retrieve solutions & return them
+    const output = Promise.all(this.finalizedList)
+    output.then(() => { if (this.callOnSuccess) this.callOnSuccess() })
+    const results = await Promise.any([output, this.cancelled])
+
+    return results
   }
 
+  // Callback hooks for various optimization process events
+  onSuccess(onSucc: () => void) { this.callOnSuccess = onSucc }
+  onWorkerError(onError: (e: ErrorEvent) => void) {
+    this.callOnWorkerError = onError
+    this.workers.forEach(w => w.addEventListener('error', onError))
+  }
+
+  // Worker creation and communication
   protected abstract makeWorker(): Worker
+  protected abstract startWorkers(): void
   private spawnWorkers() {
-    // Handle spawning workers
     for (let i = 0; i < this.numWorkers; i++) {
       const worker = this.makeWorker()
-      worker.addEventListener("error", this.onWorkerFail);
+      if (this.callOnWorkerError) worker.addEventListener("error", this.callOnWorkerError);
+
+      let finalize: (_: FinalizeResult) => void
+      const finalized = new Promise<FinalizeResult>(r => finalize = r)
+      worker.onmessage = async ({ data }: { data: Result_t | InterimResult | FinalizeResult }) => {
+        switch (data.command) {
+          case "finalize":
+            worker.terminate()
+            finalize(data as FinalizeResult)
+            break
+          case "interim":
+            this.handleInterim(data as InterimResult)
+            break
+          default:
+            this.ipc(data as Result_t, i)
+        }
+      }
 
       this.workers.push(worker)
+      this.cancelled?.then(() => worker.terminate())
+      this.finalizedList.push(finalized)
     }
   }
 
-  protected abstract startWorkers(): void
-
-  // Handle worker communications and task queueing
-  protected abstract ipc(cmd: Message_t): void
-}
-
-class TestSolver extends SolverBase<number> {
-  protected makeWorker(): Worker { return new Worker(new URL('./TestWorker.ts', import.meta.url)) }
-  protected startWorkers(): void {
-    for (let i = 0; i < this.numWorkers; i++) {
-      this.workers[i].postMessage(i)
-    }
+  // Detailed inter-process communication must be handled by implementation.
+  protected abstract ipc(result: Result_t, i: number): void
+  protected broadcast(cmd: Command_t) { this.workers.forEach(worker => worker.postMessage(cmd)) }
+  protected sendToIdle(cmd: Command_t) {
+    const id = this.idleWorkers.pop()
+    if (!id) return false
+    this.workers[id].postMessage(cmd)
+    return true
   }
 
-  protected _solveImpl(): void {
-    console.log('pretending to solve haha')
+  // Default communication types
+  protected handleInterim(result: InterimResult) {
+    throw new Error('Method not implemented.');
   }
-  protected ipc(cmd: number): void {
-    throw new Error("Method not implemented.");
-  }
-}
-
-export function testSolverBase(inp: OptProblemInput) {
-  const ts = new TestSolver(inp)
-  ts.solve()
-
-  const wkrk = new Worker(new URL('./TestWorker.ts', import.meta.url))
-  wkrk.postMessage(42)
 }
