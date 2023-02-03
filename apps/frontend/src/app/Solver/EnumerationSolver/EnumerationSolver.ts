@@ -70,8 +70,9 @@ export class EnumerationSolver extends SolverBase<WorkerCommand, WorkerResult> {
           this.requestFilters.push(result.filter);
           this.splittingWorkers.add(result.id);
         } else {
-          this.idleWorkers.push(result.id);
+          this.splittingWorkers.delete(result.id)
         }
+        this.idleWorkers.push(result.id);
         break;
       case 'iterate':
         // this.cancel()
@@ -110,21 +111,21 @@ export class EnumerationSolver extends SolverBase<WorkerCommand, WorkerResult> {
     return done
       ? undefined
       : {
-          command: 'split',
-          minCount: this.minFilterCount,
-          threshold: this.getTreshold(),
-          filter: value,
-        };
+        command: 'split',
+        minCount: this.minFilterCount,
+        threshold: this.getTreshold(),
+        filter: value,
+      };
   }
   private fetchRequestWork(): WorkerCommand | undefined {
     const filter = this.requestFilters.pop();
     return !filter
       ? undefined
       : {
-          command: 'iterate',
-          threshold: this.getTreshold(),
-          filter,
-        };
+        command: 'iterate',
+        threshold: this.getTreshold(),
+        filter,
+      };
   }
   protected distributeWork() {
     while (this.idleWorkers.length) {
@@ -140,6 +141,7 @@ export class EnumerationSolver extends SolverBase<WorkerCommand, WorkerResult> {
       if (!work) {
         work = this.fetchRequestWork();
       }
+
       if (work) {
         worker.postMessage(work);
       } else {

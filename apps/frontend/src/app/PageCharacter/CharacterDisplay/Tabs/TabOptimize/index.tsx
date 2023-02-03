@@ -431,123 +431,123 @@ export default function TabBuild() {
 
     // testSolverBase(setup2)
     console.log('=========== END TEST SOLVER BASE ===========');
-    const minFilterCount = 16_000_000, maxRequestFilterInFlight =  * 16
-    const unprunedFilters = setPerms[Symbol.iterator](), requestFilters: RequestFilter[] = []
-    const idleWorkers: number[] = [], splittingWorkers = new Set<number>()
-    const workers: Worker[] = []
-    function getThreshold(): number {
-      return wrap.buildValues[maxBuildsToShow - 1].val
-    }
-    function fetchContinueWork(): WorkerCommand {
-      return { command: "split", filter: undefined, minCount: minFilterCount, threshold: getThreshold() }
-    }
-    function fetchPruningWork(): WorkerCommand | undefined {
-      const { done, value } = unprunedFilters.next()
-      return done ? undefined : {
-        command: "split", minCount: minFilterCount,
-        threshold: getThreshold(), filter: value,
-      }
-    }
-    function fetchRequestWork(): WorkerCommand | undefined {
-      const filter = requestFilters.pop()
-      return !filter ? undefined : {
-        command: "iterate",
-        threshold: getThreshold(), filter
-      }
-    }
-    const finalizedList: Promise<FinalizeResult>[] = []
-    for (let i = 0; i < maxWorkers; i++) {
-      const worker = new Worker(new URL('./BackgroundWorker.ts', import.meta.url))
-      worker.addEventListener("error", _ => {
-        console.error("Failed to load worker")
-        setWorkerErr(true)
-        cancelToken.current()
-      });
-      const setup: Setup = {
-        command: "setup",
-        id: i, arts,
-        optimizationTarget: optimizationTargetNode,
-        plotBase: plotBaseNode,
-        maxBuilds: maxBuildsToShow,
-        filters
-      }
-      worker.postMessage(setup, undefined)
-      if (i === 0) {
-        const countCommand: WorkerCommand = { command: "count", exclusion: artSetExclusion, arts: [arts, prepruneArts] }
-        worker.postMessage(countCommand, undefined)
-      }
-      let finalize: (_: FinalizeResult) => void
-      const finalized = new Promise<FinalizeResult>(r => finalize = r)
-      worker.onmessage = async ({ data }: { data: { id: number } & WorkerResult }) => {
-        setWorkerErr(false)
-        switch (data.command) {
-          case "interim":
-            status.tested += data.tested
-            status.failed += data.failed
-            status.skipped += data.skipped
-            if (data.buildValues) {
-              wrap.buildValues = wrap.buildValues.filter(({ src }) => src !== data.source)
-              wrap.buildValues.push(...data.buildValues.map(val => ({ src: data.source, val })))
-              wrap.buildValues.sort((a, b) => b.val - a.val).splice(maxBuildsToShow)
-            }
-            break
-          case "split":
-            if (data.filter) {
-              requestFilters.push(data.filter)
-              splittingWorkers.add(data.id)
-            } else splittingWorkers.delete(data.id)
-            idleWorkers.push(data.id)
-            break
-          case "iterate":
-            idleWorkers.push(data.id)
-            break
-          case "finalize":
-            worker.terminate()
-            finalize(data);
-            // Using a timeout because when an alert is displayed, the UI doesnt update, showing an incomplete loading bar
-            setTimeout(() => {
-              // Using a ref because a user can cancel the notification while the build is going.
-              if (notificationRef.current) {
-                audio.play()
-                if (!tabFocused.current)
-                  window.alert(t`buildCompleted`)
-              }
-            }, 100);
-            return
-          case "count":
-            const [pruned, prepruned] = data.counts
-            status.total = prepruned
-            status.skipped += prepruned - pruned
-            return
-          default: console.log("DEBUG", data)
-        }
-         while (idleWorkers.length) {
-           const id = idleWorkers.pop()!, worker = workers[id]
-           let work: WorkerCommand | undefined
-           if (requestFilters.length < maxRequestFilterInFlight) {
-             work = fetchPruningWork()
-             if (!work && splittingWorkers.has(id)) work = fetchContinueWork()
-           }
-           if (!work) work = fetchRequestWork()
-           if (work) worker.postMessage(work)
-           else {
-             idleWorkers.push(id)
-             if (idleWorkers.length === 4 * maxWorkers) {
-               const command: WorkerCommand = { command: "finalize" }
-               workers.forEach(worker => worker.postMessage(command))
-             }
-             break
-           }
-         }
-       }
-       workers.push(worker)
-       cancelled.then(() => worker.terminate())
-       finalizedList.push(finalized)
-     }
-     for (let i = 0; i < 3; i++)
-       idleWorkers.push(...range(0, maxWorkers - 1))
-    const buildTimer = setInterval(() => setBuildStatus({ type: "active", ...status }), 100)
-    const results = await Promise.any([Promise.all(finalizedList), cancelled])
+    // const minFilterCount = 16_000_000, maxRequestFilterInFlight =  * 16
+    // const unprunedFilters = setPerms[Symbol.iterator](), requestFilters: RequestFilter[] = []
+    // const idleWorkers: number[] = [], splittingWorkers = new Set<number>()
+    // const workers: Worker[] = []
+    // function getThreshold(): number {
+    //   return wrap.buildValues[maxBuildsToShow - 1].val
+    // }
+    // function fetchContinueWork(): WorkerCommand {
+    //   return { command: "split", filter: undefined, minCount: minFilterCount, threshold: getThreshold() }
+    // }
+    // function fetchPruningWork(): WorkerCommand | undefined {
+    //   const { done, value } = unprunedFilters.next()
+    //   return done ? undefined : {
+    //     command: "split", minCount: minFilterCount,
+    //     threshold: getThreshold(), filter: value,
+    //   }
+    // }
+    // function fetchRequestWork(): WorkerCommand | undefined {
+    //   const filter = requestFilters.pop()
+    //   return !filter ? undefined : {
+    //     command: "iterate",
+    //     threshold: getThreshold(), filter
+    //   }
+    // }
+    // const finalizedList: Promise<FinalizeResult>[] = []
+    // for (let i = 0; i < maxWorkers; i++) {
+    //   const worker = new Worker(new URL('./BackgroundWorker.ts', import.meta.url))
+    //   worker.addEventListener("error", _ => {
+    //     console.error("Failed to load worker")
+    //     setWorkerErr(true)
+    //     cancelToken.current()
+    //   });
+    //   const setup: Setup = {
+    //     command: "setup",
+    //     id: i, arts,
+    //     optimizationTarget: optimizationTargetNode,
+    //     plotBase: plotBaseNode,
+    //     maxBuilds: maxBuildsToShow,
+    //     filters
+    //   }
+    //   worker.postMessage(setup, undefined)
+    //   if (i === 0) {
+    //     const countCommand: WorkerCommand = { command: "count", exclusion: artSetExclusion, arts: [arts, prepruneArts] }
+    //     worker.postMessage(countCommand, undefined)
+    //   }
+    //   let finalize: (_: FinalizeResult) => void
+    //   const finalized = new Promise<FinalizeResult>(r => finalize = r)
+    //   worker.onmessage = async ({ data }: { data: { id: number } & WorkerResult }) => {
+    //     setWorkerErr(false)
+    //     switch (data.command) {
+    //       case "interim":
+    //         status.tested += data.tested
+    //         status.failed += data.failed
+    //         status.skipped += data.skipped
+    //         if (data.buildValues) {
+    //           wrap.buildValues = wrap.buildValues.filter(({ src }) => src !== data.source)
+    //           wrap.buildValues.push(...data.buildValues.map(val => ({ src: data.source, val })))
+    //           wrap.buildValues.sort((a, b) => b.val - a.val).splice(maxBuildsToShow)
+    //         }
+    //         break
+    //       case "split":
+    //         if (data.filter) {
+    //           requestFilters.push(data.filter)
+    //           splittingWorkers.add(data.id)
+    //         } else splittingWorkers.delete(data.id)
+    //         idleWorkers.push(data.id)
+    //         break
+    //       case "iterate":
+    //         idleWorkers.push(data.id)
+    //         break
+    //       case "finalize":
+    //         worker.terminate()
+    //         finalize(data);
+    //         // Using a timeout because when an alert is displayed, the UI doesnt update, showing an incomplete loading bar
+    //         setTimeout(() => {
+    //           // Using a ref because a user can cancel the notification while the build is going.
+    //           if (notificationRef.current) {
+    //             audio.play()
+    //             if (!tabFocused.current)
+    //               window.alert(t`buildCompleted`)
+    //           }
+    //         }, 100);
+    //         return
+    //       case "count":
+    //         const [pruned, prepruned] = data.counts
+    //         status.total = prepruned
+    //         status.skipped += prepruned - pruned
+    //         return
+    //       default: console.log("DEBUG", data)
+    //     }
+    //      while (idleWorkers.length) {
+    //        const id = idleWorkers.pop()!, worker = workers[id]
+    //        let work: WorkerCommand | undefined
+    //        if (requestFilters.length < maxRequestFilterInFlight) {
+    //          work = fetchPruningWork()
+    //          if (!work && splittingWorkers.has(id)) work = fetchContinueWork()
+    //        }
+    //        if (!work) work = fetchRequestWork()
+    //        if (work) worker.postMessage(work)
+    //        else {
+    //          idleWorkers.push(id)
+    //          if (idleWorkers.length === 4 * maxWorkers) {
+    //            const command: WorkerCommand = { command: "finalize" }
+    //            workers.forEach(worker => worker.postMessage(command))
+    //          }
+    //          break
+    //        }
+    //      }
+    //    }
+    //    workers.push(worker)
+    //    cancelled.then(() => worker.terminate())
+    //    finalizedList.push(finalized)
+    //  }
+    //  for (let i = 0; i < 3; i++)
+    //    idleWorkers.push(...range(0, maxWorkers - 1))
+    // const buildTimer = setInterval(() => setBuildStatus({ type: "active", ...status }), 100)
+    // const results = await Promise.any([Promise.all(finalizedList), cancelled])
     clearInterval(buildTimer);
     cancelToken.current = () => {};
 

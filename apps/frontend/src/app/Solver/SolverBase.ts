@@ -56,7 +56,7 @@ export abstract class SolverBase<
   callOnSuccess?: () => void;
 
   // eslint-disable-next-line @typescript-eslint/no-empty-function
-  private doCancel: () => void = () => {};
+  private doCancel: () => void = () => { };
   private cancelled: Promise<void>;
   protected idleWorkers: number[] = [];
   protected splittingWorkers = new Set<number>();
