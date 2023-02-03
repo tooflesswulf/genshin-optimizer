@@ -20,6 +20,7 @@ export interface InterimResult {
   tested: number,         // Number of builds since last report (including failed)
   failed: number,         // Number of builds that fail ArtsetExcl or constraints
   skipped: number,
+  source: string,
 }
 export interface FinalizeResult {
   command: "finalize"
@@ -39,6 +40,7 @@ export abstract class SolverBase<Command_t, Result_t extends { command: string }
   protected numWorkers: number;
   protected workers: Worker[] = [];
 
+  wrap: { buildValues: { src: string, val: number }[] }
   computeStatus: Omit<BuildStatus, "type">;
 
   callOnWorkerError?: (e: ErrorEvent) => void;
@@ -60,8 +62,9 @@ export abstract class SolverBase<Command_t, Result_t extends { command: string }
     this.plotBase = input.plotBase
     this.numWorkers = input.numWorkers
 
-    this.cancelled = new Promise(r => this.doCancel = r)
+    this.wrap = { buildValues: Array(this.topN).fill(0).map(_ => ({ src: "", val: -Infinity })) }
     this.computeStatus = { tested: 0, failed: 0, skipped: 0, total: NaN, startTime: performance.now() };
+    this.cancelled = new Promise(r => this.doCancel = r)
   }
 
   preprocess() {
@@ -133,6 +136,13 @@ export abstract class SolverBase<Command_t, Result_t extends { command: string }
 
   // Default communication types
   protected handleInterim(result: InterimResult) {
-    throw new Error('Method not implemented.');
+    this.computeStatus.tested += result.tested
+    this.computeStatus.failed += result.failed
+    this.computeStatus.skipped += result.skipped
+    if (result.buildValues) {
+      this.wrap.buildValues.filter(({ src }) => src !== result.source)
+      this.wrap.buildValues.push(...result.buildValues.map(val => ({ src: result.source, val })))
+      this.wrap.buildValues.sort((a, b) => b.val - a.val).splice(this.topN)
+    }
   }
 }
