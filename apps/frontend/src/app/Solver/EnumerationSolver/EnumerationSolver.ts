@@ -42,84 +42,60 @@ export class EnumerationSolver extends SolverBase<WorkerCommand, WorkerResult> {
     switch (result.command) {
       case "split":
         if (result.filter) {
-          this.requestFilters.push(result.filter);
-          this.splittingWorkers.add(result.id);
+          this.requestFilters.push(result.filter)
+          this.splittingWorkers.add(result.id)
         } else {
           this.splittingWorkers.delete(result.id)
         }
-        this.idleWorkers.push(result.id);
-        break;
+        this.idleWorkers.push(result.id)
+        break
       case "iterate":
-        this.idleWorkers.push(result.id);
-        break;
+        this.idleWorkers.push(result.id)
+        break
       case "count": {
-        const [pruned] = result.counts;
-        this.computeStatus.total = pruned;
-        // this.computeStatus.skipped += prepruned - pruned;
-        break;
+        const [pruned] = result.counts
+        this.computeStatus.total = pruned
+        // this.computeStatus.skipped += prepruned - pruned
+        break
       }
       default:
-        console.log('DEBUG', result);
+        console.log('DEBUG', result)
     }
   }
 
   // Handle Work Distribution
   private getTreshold(): number {
-    return this.wrap.buildValues[this.topN - 1].val;
+    return this.wrap.buildValues[this.topN - 1].val
   }
 
   private fetchContinueWork(): WorkerCommand {
-    return {
-      command: 'split',
-      filter: undefined,
-      minCount: this.minFilterCount,
-      threshold: this.getTreshold(),
-    };
+    return { command: 'split', filter: undefined, minCount: this.minFilterCount, threshold: this.getTreshold() }
   }
 
   private fetchPruningWork(): WorkerCommand | undefined {
     const { done, value } = this.unprunedFilters.next();
-    return done
-      ? undefined
-      : {
-        command: 'split',
-        minCount: this.minFilterCount,
-        threshold: this.getTreshold(),
-        filter: value,
-      };
+    return done ? undefined : { command: 'split', minCount: this.minFilterCount, threshold: this.getTreshold(), filter: value }
   }
   private fetchRequestWork(): WorkerCommand | undefined {
     const filter = this.requestFilters.pop();
-    return !filter
-      ? undefined
-      : {
-        command: 'iterate',
-        threshold: this.getTreshold(),
-        filter,
-      };
+    return !filter ? undefined : { command: 'iterate', threshold: this.getTreshold(), filter }
   }
   protected afterOnMessage() {
     while (this.idleWorkers.length) {
-      const id = this.idleWorkers.pop()!,
-        worker = this.workers[id];
-      let work: WorkerCommand | undefined;
+      const id = this.idleWorkers.pop()!, worker = this.workers[id]
+      let work: WorkerCommand | undefined
       if (this.requestFilters.length < this.maxRequestFilterInFlight) {
-        work = this.fetchPruningWork();
-        if (!work && this.splittingWorkers.has(id)) {
-          work = this.fetchContinueWork();
-        }
+        work = this.fetchPruningWork()
+        if (!work && this.splittingWorkers.has(id)) { work = this.fetchContinueWork() }
       }
-      if (!work) {
-        work = this.fetchRequestWork();
-      }
+      if (!work) { work = this.fetchRequestWork() }
 
-      if (work) {
-        worker.postMessage(work);
-      } else {
-        this.idleWorkers.push(id);
+      if (work) { worker.postMessage(work) }
+      else {
+        this.idleWorkers.push(id)
         if (this.idleWorkers.length === this.numWorkers) {
-          const command: WorkerCommand = { command: 'finalize' };
-          this.workers.forEach(worker => worker.postMessage(command));
+          const command: WorkerCommand = { command: 'finalize' }
+          this.workers.forEach(worker => worker.postMessage(command))
         }
         break
       }
