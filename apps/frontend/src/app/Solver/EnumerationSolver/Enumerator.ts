@@ -4,9 +4,9 @@ import type { InterimResult } from '../SolverBase';
 import { ArtifactBuildData, ArtifactsBySlot, Build, countBuilds, filterArts, mergePlot, PlotData, pruneAll, RequestFilter } from '../common';
 
 export class Enumerator {
-  builds: Build[] = [];
-  buildValues?: number[];
-  plotData?: PlotData;
+  builds: Build[] = []
+  buildValues?: number[]
+  plotData?: PlotData
   threshold = -Infinity
   maxBuilds: number
   min: number[]
@@ -31,8 +31,56 @@ export class Enumerator {
   }
 
   compute(newThreshold: number, filter: RequestFilter) {
-    // use enumerate from enumerate.ts maybe?
-    throw new Error('Not implemented.')
+    if (this.threshold > newThreshold) this.threshold = newThreshold
+    const { min, interimReport } = this, self = this // `this` in nested functions means different things
+    let preArts = filterArts(this.arts, filter)
+    const totalCount = countBuilds(preArts), oldMaxBuildCount = this.builds.length
+
+    let nodes = this.nodes;
+    ({ nodes, arts: preArts } = pruneAll(nodes, min, preArts, this.maxBuilds, {}, {
+      pruneArtRange: true, pruneNodeRange: true,
+    }))
+    const arts = Object.values(preArts.values).sort((a, b) => a.length - b.length)
+    const compute = precompute(nodes, preArts.base, f => f.path[1], arts.length)
+
+    const buffer = Array<ArtifactBuildData>(arts.length)
+    const count = { tested: 0, failed: 0, skipped: totalCount - countBuilds(preArts) }
+
+    function permute(i: number) {
+      if (i < 0) {
+        const result = compute(buffer)
+        if (min.every((m, i) => (m <= result[i]))) {
+          const value = result[min.length], { builds, plotData } = self
+          let build: Build | undefined
+          if (value >= self.threshold) {
+            build = { value, artifactIds: buffer.map(x => x.id).filter(id => id) }
+            builds.push(build)
+          }
+          if (plotData) {
+            const x = result[min.length + 1]
+            if (!plotData[x] || plotData[x]!.value < value) {
+              if (!build) build = { value, artifactIds: buffer.map(x => x.id).filter(id => id) }
+              build.plot = x
+              plotData[x] = build
+            }
+          }
+        }
+        else count.failed += 1
+        return
+      }
+      arts[i].forEach(art => {
+        buffer[i] = art
+        permute(i - 1)
+      })
+      if (i === 0) {
+        count.tested += arts[0].length
+        if (count.tested > 1 << 16)
+          interimReport(count)
+      }
+    }
+
+    permute(arts.length - 1)
+    interimReport(count, this.builds.length > oldMaxBuildCount)
   }
 
   refresh(force: boolean): void {
@@ -47,5 +95,13 @@ export class Enumerator {
       this.buildValues = this.builds.map(x => x.value)
       this.threshold = Math.max(this.threshold, this.buildValues[maxBuilds - 1] ?? -Infinity)
     }
+  }
+  interimReport = (count: { tested: number, failed: number, skipped: number }, forced = false) => {
+    this.refresh(forced)
+    this.callback({ command: "interim", buildValues: this.buildValues, ...count })
+    this.buildValues = undefined
+    count.tested = 0
+    count.failed = 0
+    count.skipped = 0
   }
 }

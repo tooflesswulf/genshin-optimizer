@@ -228,8 +228,9 @@ export default function TabBuild() {
     const solver: SolverBase<unknown, { command: string }> = new EnumerationSolver(setup2)
 
     cancelled.then(() => solver.cancel())
-    solver.onWorkerError(_ => {
+    solver.onWorkerError(e => {
       console.log('Failed to load worker')
+      console.log(e)
       setWorkerErr(true)
       cancelToken.current()
     })

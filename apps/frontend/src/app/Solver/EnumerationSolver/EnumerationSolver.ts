@@ -53,9 +53,9 @@ export class EnumerationSolver extends SolverBase<WorkerCommand, WorkerResult> {
         this.idleWorkers.push(result.id);
         break;
       case "count": {
-        const [pruned, prepruned] = result.counts;
-        this.computeStatus.total = prepruned;
-        this.computeStatus.skipped += prepruned - pruned;
+        const [pruned] = result.counts;
+        this.computeStatus.total = pruned;
+        // this.computeStatus.skipped += prepruned - pruned;
         break;
       }
       default:
@@ -117,10 +117,11 @@ export class EnumerationSolver extends SolverBase<WorkerCommand, WorkerResult> {
         worker.postMessage(work);
       } else {
         this.idleWorkers.push(id);
-        if (this.idleWorkers.length === 4 * this.numWorkers) {
+        if (this.idleWorkers.length === this.numWorkers) {
           const command: WorkerCommand = { command: 'finalize' };
-          this.workers.forEach((worker) => worker.postMessage(command));
+          this.workers.forEach(worker => worker.postMessage(command));
         }
+        break
       }
     }
   }
