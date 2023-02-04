@@ -188,27 +188,46 @@ export default function TabBuild() {
     const cancelled = new Promise<void>(r => cancelToken.current = r)
 
     const unoptimizedNodes = [...valueFilter.map(x => x.value), unoptimizedOptimizationTargetNode]
-    let arts = split!
+    const plotBaseNumNode: NumNode = plotBase && objPathValue(workerData.display ?? {}, plotBase)
+    if (plotBaseNumNode) unoptimizedNodes.push(plotBaseNumNode)
+
+    let nodes = optimize(unoptimizedNodes, workerData, ({ path: [p] }) => p !== "dyn")
+
+    const plotBaseNode = plotBaseNumNode ? nodes.pop() : undefined
+    const optimizationTargetNode = nodes.pop()
+    if (!optimizationTargetNode) throw Error('Cannot reach ehre.')
+
+    const baseProblem: OptProblemInput = {
+      arts: split, optimizationTarget: optimizationTargetNode,
+      artSet: artSetExclusion, constraints: nodes.map((value, i) => ({value, min: minimum[i]})),
+
+      topN: maxBuildsToShow, plotBase: plotBaseNode, numWorkers: maxWorkers
+    }
+    const solver: SolverBase<unknown, { command: string }> = new EnumerationSolver(baseProblem)
+    setWorkerErr(false)
+
+
+
+    let arts = split
     const setPerms = filterFeasiblePerm(artSetPerm(artSetExclusion, Object.values(split.values).flatMap(x => x.map(x => x.set!))), split)
 
     const minimum = [...valueFilter.map(x => x.minimum), -Infinity]
-    const status: Omit<BuildStatus, "type"> = { tested: 0, failed: 0, skipped: 0, total: NaN, startTime: performance.now() }
-    const plotBaseNumNode: NumNode = plotBase && objPathValue(workerData.display ?? {}, plotBase)
+    // const status: Omit<BuildStatus, "type"> = { tested: 0, failed: 0, skipped: 0, total: NaN, startTime: performance.now() }
+    // const plotBaseNumNode: NumNode = plotBase && objPathValue(workerData.display ?? {}, plotBase)
     if (plotBaseNumNode) {
       unoptimizedNodes.push(plotBaseNumNode)
       minimum.push(-Infinity)
     }
 
     const prepruneArts = arts
-    let nodes = optimize(unoptimizedNodes, workerData, ({ path: [p] }) => p !== "dyn")
+    // let nodes = optimize(unoptimizedNodes, workerData, ({ path: [p] }) => p !== "dyn")
     nodes = pruneExclusion(nodes, artSetExclusion);
     ({ nodes, arts } = pruneAll(nodes, minimum, arts, maxBuildsToShow, artSetExclusion, {
       reaffine: true, pruneArtRange: true, pruneNodeRange: true, pruneOrder: true
     }))
     nodes = optimize(nodes, {}, _ => false)
 
-    const plotBaseNode = plotBaseNumNode ? nodes.pop() : undefined
-    const optimizationTargetNode = nodes.pop()!
+    // const plotBaseNode = plotBaseNumNode ? nodes.pop() : undefined
 
     // const wrap = { buildValues: Array(maxBuildsToShow).fill(0).map(_ => ({ src: "", val: -Infinity })) }
 
@@ -217,15 +236,14 @@ export default function TabBuild() {
       .filter(x => x.min > -Infinity)
 
     console.log('=========== TEST SOLVER BASE ===========')
-    const setup2: OptProblemInput = {
-      arts, optimizationTarget: optimizationTargetNode,
-      constraints: filters, artSet: artSetExclusion,
+    // const setup2: OptProblemInput = {
+    //   arts, optimizationTarget: optimizationTargetNode,
+    //   constraints: filters, artSet: artSetExclusion,
 
-      topN: maxBuildsToShow, plotBase: plotBaseNode,
-      numWorkers: maxWorkers,
-    }
-    setWorkerErr(false)
-    const solver: SolverBase<unknown, { command: string }> = new EnumerationSolver(setup2)
+    //   topN: maxBuildsToShow, plotBase: plotBaseNode,
+    //   numWorkers: maxWorkers,
+    // }
+    // const solver: SolverBase<unknown, { command: string }> = new EnumerationSolver(setup2)
 
     cancelled.then(() => solver.cancel())
     solver.onWorkerError(e => {
@@ -377,10 +395,10 @@ export default function TabBuild() {
     cancelToken.current = () => { }
 
     if (!results) {
-      status.tested = 0
-      status.failed = 0
-      status.skipped = 0
-      status.total = 0
+      solver.computeStatus.tested = 0
+      solver.computeStatus.failed = 0
+      solver.computeStatus.skipped = 0
+      solver.computeStatus.total = 0
     } else {
       if (plotBaseNumNode) {
         const plotData = mergePlot(results.map(x => x.plotData!))
@@ -399,7 +417,7 @@ export default function TabBuild() {
       if (process.env.NODE_ENV === "development") console.log("Build Result", builds)
       buildResultDispatch({ builds: builds.map(build => build.artifactIds), buildDate: Date.now() })
     }
-    setBuildStatus({ ...status, type: "inactive", finishTime: performance.now() })
+    setBuildStatus({ ...solver.computeStatus, type: "inactive", finishTime: performance.now() })
   }, [t, characterKey, filteredArts, database, buildResultDispatch, maxWorkers, buildSetting, notificationRef, setChartData, gender])
 
   const characterName = characterSheet?.name ?? "Character Name"

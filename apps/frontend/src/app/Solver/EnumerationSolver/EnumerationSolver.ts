@@ -23,6 +23,11 @@ export class EnumerationSolver extends SolverBase<WorkerCommand, WorkerResult> {
     this.workers[0].postMessage(countCommand)
   }
 
+  preprocess(input: OptProblemInput): OptProblemInput {
+    // TODO: implement
+    return {...input}
+  }
+
   protected splittingWorkers = new Set<number>()
   private minFilterCount = 16_000_000
   private unprunedFilters: Iterator<RequestFilter>

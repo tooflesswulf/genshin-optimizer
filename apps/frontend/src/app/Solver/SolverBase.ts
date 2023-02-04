@@ -57,6 +57,8 @@ export abstract class SolverBase<Command_t, Result_t extends { command: string }
   finalizer: ((_: FinalizeResult) => void)[] = []
 
   constructor(input: OptProblemInput) {
+    input = this.preprocess(input)
+
     this.arts = input.arts
     this.opt = input.optimizationTarget
     this.constraints = input.constraints
@@ -70,8 +72,9 @@ export abstract class SolverBase<Command_t, Result_t extends { command: string }
     this.cancelled = new Promise(r => this.doCancel = r)
   }
 
-  preprocess() {
+  preprocess(input: OptProblemInput) {
     // Common pre-processing steps?
+    return input
   }
 
   // Work Distribution must be handled by implementation
@@ -80,8 +83,6 @@ export abstract class SolverBase<Command_t, Result_t extends { command: string }
   // Runs the main optimization process
   cancel() { this.doCancel() }
   async solve() {
-    this.preprocess()
-
     this.spawnWorkers()
     this.startWorkers()
 
