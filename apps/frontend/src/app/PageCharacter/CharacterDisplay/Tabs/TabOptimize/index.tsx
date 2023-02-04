@@ -210,7 +210,7 @@ export default function TabBuild() {
     const plotBaseNode = plotBaseNumNode ? nodes.pop() : undefined
     const optimizationTargetNode = nodes.pop()!
 
-    const wrap = { buildValues: Array(maxBuildsToShow).fill(0).map(_ => ({ src: "", val: -Infinity })) }
+    // const wrap = { buildValues: Array(maxBuildsToShow).fill(0).map(_ => ({ src: "", val: -Infinity })) }
 
     const filters = nodes
       .map((value, i) => ({ value, min: minimum[i] }))
@@ -228,15 +228,26 @@ export default function TabBuild() {
     const solver: SolverBase<unknown, { command: string }> = new EnumerationSolver(setup2)
 
     cancelled.then(() => solver.cancel())
-    solver.onWorkerError(_ => {
+    solver.onWorkerError(e => {
       console.log('Failed to load worker')
+      console.log(e)
       setWorkerErr(true)
       cancelToken.current()
     })
     const buildTimer = setInterval(() => setBuildStatus({ type: "active", ...solver.computeStatus }), 100)
+    solver.callOnSuccess = () => {
+      setTimeout(() => {
+        // Using a ref because a user can cancel the notification while the build is going.
+        if (results) {
+          if (notificationRef.current) {
+            audio.play()
+            if (!tabFocused.current) window.alert(t`buildCompleted`)
+          }
+        }
+      }, 100)
+    }
 
     const results = await solver.solve()
-    // testSolverBase(setup2)
     console.log('=========== END TEST SOLVER BASE ===========')
 
     // const minFilterCount = 16_000_000, maxRequestFilterInFlight = maxWorkers * 16
