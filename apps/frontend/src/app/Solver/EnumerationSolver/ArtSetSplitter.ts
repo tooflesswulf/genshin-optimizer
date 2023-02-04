@@ -1,7 +1,7 @@
 import { allSlotKeys } from '@genshin-optimizer/consts';
 import type { Setup } from './EnumerationSolver';
 import type { InterimResult } from '../SolverBase'
-import { ArtifactsBySlot, countBuilds, filterArts, RequestFilter} from '../../PageCharacter/CharacterDisplay/Tabs/TabOptimize/common';
+import { ArtifactsBySlot, countBuilds, filterArts, RequestFilter} from '../common';
 
 // Splits artifacts in one slot based on their set key. If none are left, split arbitrarily.
 export class ArtSetSplitter {

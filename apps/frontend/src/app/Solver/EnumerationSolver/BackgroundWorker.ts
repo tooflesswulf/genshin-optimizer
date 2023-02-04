@@ -1,4 +1,4 @@
-import { artSetPerm, countBuilds, filterArts, filterFeasiblePerm } from "../../PageCharacter/CharacterDisplay/Tabs/TabOptimize/common"
+import { artSetPerm, countBuilds, filterArts, filterFeasiblePerm } from "../common"
 import { assertUnreachable } from "../../Util/Util"
 import { WorkerCommand, WorkerResult } from "./EnumerationSolver"
 import { ArtSetSplitter } from "./ArtSetSplitter"

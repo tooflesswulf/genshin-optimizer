@@ -1,6 +1,6 @@
 import { ArtSetExclusion } from "../../Database/DataManagers/BuildSettingData";
 import { OptNode } from "../../Formula/optimization";
-import { ArtifactsBySlot, Build, PlotData, RequestFilter, artSetPerm, filterFeasiblePerm } from "../../PageCharacter/CharacterDisplay/Tabs/TabOptimize/common";
+import { ArtifactsBySlot, RequestFilter, artSetPerm, filterFeasiblePerm } from "../common";
 import { SolverBase, SourcedInterimResult, FinalizeResult, OptProblemInput } from "../SolverBase";
 
 export class EnumerationSolver extends SolverBase<WorkerCommand, WorkerResult> {

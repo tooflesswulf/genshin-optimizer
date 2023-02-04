@@ -1,7 +1,7 @@
 import { optimize, OptNode, precompute } from '../../Formula/optimization';
 import type { Setup } from './EnumerationSolver';
 import type { InterimResult } from '../SolverBase';
-import { ArtifactBuildData, ArtifactsBySlot, Build, countBuilds, filterArts, mergePlot, PlotData, pruneAll, RequestFilter } from '../../PageCharacter/CharacterDisplay/Tabs/TabOptimize/common';
+import { ArtifactBuildData, ArtifactsBySlot, Build, countBuilds, filterArts, mergePlot, PlotData, pruneAll, RequestFilter } from '../common';
 
 export class Enumerator {
   builds: Build[] = [];
