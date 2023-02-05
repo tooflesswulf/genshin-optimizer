@@ -186,6 +186,7 @@ export default function TabBuild() {
     setChartData(undefined)
 
     const cancelled = new Promise<void>(r => cancelToken.current = r)
+    setWorkerErr(false)
 
     const unoptimizedNodes = [...valueFilter.map(x => x.value), unoptimizedOptimizationTargetNode]
     const plotBaseNumNode: NumNode = plotBase && objPathValue(workerData.display ?? {}, plotBase)
@@ -204,7 +205,27 @@ export default function TabBuild() {
       topN: maxBuildsToShow, plotBase: plotBaseNode, numWorkers: maxWorkers
     }
     const solver: SolverBase<unknown, { command: string }> = new EnumerationSolver(baseProblem)
-    setWorkerErr(false)
+    cancelled.then(() => solver.cancel())
+    solver.onWorkerError(e => {
+      console.log('Failed to load worker')
+      console.log(e)
+      setWorkerErr(true)
+      cancelToken.current()
+    })
+    solver.onSuccess(() => {
+      setTimeout(() => {
+        // Using a ref because a user can cancel the notification while the build is going.
+        if (results) {
+          if (notificationRef.current) {
+            audio.play()
+            if (!tabFocused.current) window.alert(t`buildCompleted`)
+          }
+        }
+      }, 100)
+    })
+    const buildTimer = setInterval(() => setBuildStatus({ type: "active", ...solver.computeStatus }), 100)
+
+    const results = await solver.solve()
 
 
 
@@ -245,27 +266,27 @@ export default function TabBuild() {
     // }
     // const solver: SolverBase<unknown, { command: string }> = new EnumerationSolver(setup2)
 
-    cancelled.then(() => solver.cancel())
-    solver.onWorkerError(e => {
-      console.log('Failed to load worker')
-      console.log(e)
-      setWorkerErr(true)
-      cancelToken.current()
-    })
-    const buildTimer = setInterval(() => setBuildStatus({ type: "active", ...solver.computeStatus }), 100)
-    solver.callOnSuccess = () => {
-      setTimeout(() => {
-        // Using a ref because a user can cancel the notification while the build is going.
-        if (results) {
-          if (notificationRef.current) {
-            audio.play()
-            if (!tabFocused.current) window.alert(t`buildCompleted`)
-          }
-        }
-      }, 100)
-    }
+    // cancelled.then(() => solver.cancel())
+    // solver.onWorkerError(e => {
+    //   console.log('Failed to load worker')
+    //   console.log(e)
+    //   setWorkerErr(true)
+    //   cancelToken.current()
+    // })
+    // solver.onSuccess(() => {
+    //   setTimeout(() => {
+    //     // Using a ref because a user can cancel the notification while the build is going.
+    //     if (results) {
+    //       if (notificationRef.current) {
+    //         audio.play()
+    //         if (!tabFocused.current) window.alert(t`buildCompleted`)
+    //       }
+    //     }
+    //   }, 100)
+    // })
+    // const buildTimer = setInterval(() => setBuildStatus({ type: "active", ...solver.computeStatus }), 100)
 
-    const results = await solver.solve()
+    // const results = await solver.solve()
     console.log('=========== END TEST SOLVER BASE ===========')
 
     // const minFilterCount = 16_000_000, maxRequestFilterInFlight = maxWorkers * 16
