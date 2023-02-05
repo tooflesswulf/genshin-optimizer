@@ -72,15 +72,12 @@ export abstract class SolverBase<Command_t, Result_t extends { command: string }
   }
 
   preprocess(input: OptProblemInput) {
-    // Common pre-processing steps?
+    // Common pre-processing steps go here.
     return input
   }
 
-  // Work Distribution must be handled by implementation
-  protected abstract afterOnMessage(): void
 
   // Runs the main optimization process
-  cancel() { this.doCancel() }
   async solve() {
     this.spawnWorkers()
     this.startWorkers()
@@ -92,6 +89,7 @@ export abstract class SolverBase<Command_t, Result_t extends { command: string }
 
     return results
   }
+  cancel() { this.doCancel() }
 
   // Callback hooks for various optimization process events
   onSuccess(onSucc: () => void) { this.callOnSuccess = onSucc }
@@ -128,11 +126,11 @@ export abstract class SolverBase<Command_t, Result_t extends { command: string }
       this.cancelled?.then(() => worker.terminate())
       this.finalizedList.push(finalized)
     }
-    // this.idleWorkers.push(...range(0, this.numWorkers - 1))
   }
 
   // Detailed inter-process communication must be handled by implementation.
   protected abstract ipc(result: Result_t, id: number): void
+  protected abstract afterOnMessage(): void
   protected broadcast(cmd: Command_t) { this.workers.forEach(worker => worker.postMessage(cmd)) }
   protected sendToIdle(cmd: Command_t) {
     const id = this.idleWorkers.pop()

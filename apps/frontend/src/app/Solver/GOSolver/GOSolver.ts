@@ -8,12 +8,9 @@ export class EnumerationSolver extends SolverBase<WorkerCommand, WorkerResult> {
   protected startWorkers(): void {
     for (let i = 0; i < this.numWorkers; i++) {
       const setup: Setup = {
-        command: "setup",
-        id: i, arts: this.arts,
-        optimizationTarget: this.opt,
-        plotBase: this.plotBase,
-        maxBuilds: this.topN,
-        filters: this.constraints,
+        command: "setup", id: i, arts: this.arts,
+        optimizationTarget: this.opt, plotBase: this.plotBase,
+        filters: this.constraints, maxBuilds: this.topN
       }
 
       this.workers[i].postMessage(setup)
@@ -45,7 +42,7 @@ export class EnumerationSolver extends SolverBase<WorkerCommand, WorkerResult> {
     const newOptTarget = nodes.pop()
     if (!newOptTarget) throw Error('Nodes are empty.')
 
-    return { ...input, arts: newNodesArts.arts, optimizationTarget: newOptTarget, plotBase: pb, constraints: nodes.map((value, i) => ({value, min: minimums[i]})) }
+    return { ...input, arts: newNodesArts.arts, optimizationTarget: newOptTarget, plotBase: pb, constraints: nodes.map((value, i) => ({ value, min: minimums[i] })) }
   }
 
   protected splittingWorkers = new Set<number>()
@@ -89,21 +86,19 @@ export class EnumerationSolver extends SolverBase<WorkerCommand, WorkerResult> {
   }
 
   // Handle Work Distribution
-  private getTreshold(): number {
+  private getThreshold(): number {
     return this.wrap.buildValues[this.topN - 1].val
   }
-
   private fetchContinueWork(): WorkerCommand {
-    return { command: 'split', filter: undefined, minCount: this.minFilterCount, threshold: this.getTreshold() }
+    return { command: 'split', filter: undefined, minCount: this.minFilterCount, threshold: this.getThreshold() }
   }
-
   private fetchPruningWork(): WorkerCommand | undefined {
     const { done, value } = this.unprunedFilters.next();
-    return done ? undefined : { command: 'split', minCount: this.minFilterCount, threshold: this.getTreshold(), filter: value }
+    return done ? undefined : { command: 'split', minCount: this.minFilterCount, threshold: this.getThreshold(), filter: value }
   }
   private fetchRequestWork(): WorkerCommand | undefined {
     const filter = this.requestFilters.pop();
-    return !filter ? undefined : { command: 'iterate', threshold: this.getTreshold(), filter }
+    return !filter ? undefined : { command: 'iterate', threshold: this.getThreshold(), filter }
   }
   protected afterOnMessage() {
     while (this.idleWorkers.length) {
