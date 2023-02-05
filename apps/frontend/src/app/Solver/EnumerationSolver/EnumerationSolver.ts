@@ -25,7 +25,8 @@ export class EnumerationSolver extends SolverBase<WorkerCommand, WorkerResult> {
 
   preprocess(input: OptProblemInput): OptProblemInput {
     // TODO: implement
-    return {...input}
+    const filters = input.constraints.filter((x) => x.min > -Infinity)
+    return { ...input, constraints: filters }
   }
 
   protected splittingWorkers = new Set<number>()

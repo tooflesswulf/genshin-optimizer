@@ -188,18 +188,29 @@ export default function TabBuild() {
     const cancelled = new Promise<void>(r => cancelToken.current = r)
 
     const unoptimizedNodes = [...valueFilter.map(x => x.value), unoptimizedOptimizationTargetNode]
+    const minimum = [...valueFilter.map(x => x.minimum), -Infinity]
     const plotBaseNumNode: NumNode = plotBase && objPathValue(workerData.display ?? {}, plotBase)
-    if (plotBaseNumNode) unoptimizedNodes.push(plotBaseNumNode)
+    if (plotBaseNumNode) {
+      unoptimizedNodes.push(plotBaseNumNode)
+      minimum.push(-Infinity)
+
+
+    }
 
     let nodes = optimize(unoptimizedNodes, workerData, ({ path: [p] }) => p !== "dyn")
+    let arts = split
 
     const plotBaseNode = plotBaseNumNode ? nodes.pop() : undefined
     const optimizationTargetNode = nodes.pop()
     if (!optimizationTargetNode) throw Error('Cannot reach ehre.')
-
+    nodes = pruneExclusion(nodes, artSetExclusion);
+    ({ nodes, arts } = pruneAll(nodes, minimum, arts, maxBuildsToShow, artSetExclusion, {
+      reaffine: true, pruneArtRange: true, pruneNodeRange: true, pruneOrder: true
+    }))
+    nodes = optimize(nodes, {}, _ => false)
     const baseProblem: OptProblemInput = {
-      arts: split, optimizationTarget: optimizationTargetNode,
-      artSet: artSetExclusion, constraints: nodes.map((value, i) => ({value, min: minimum[i]})),
+      arts: arts, optimizationTarget: optimizationTargetNode,
+      artSet: artSetExclusion, constraints: nodes.map((value, i) => ({ value, min: minimum[i] })),
 
       topN: maxBuildsToShow, plotBase: plotBaseNode, numWorkers: maxWorkers
     }
@@ -208,32 +219,24 @@ export default function TabBuild() {
 
 
 
-    let arts = split
     const setPerms = filterFeasiblePerm(artSetPerm(artSetExclusion, Object.values(split.values).flatMap(x => x.map(x => x.set!))), split)
 
-    const minimum = [...valueFilter.map(x => x.minimum), -Infinity]
     // const status: Omit<BuildStatus, "type"> = { tested: 0, failed: 0, skipped: 0, total: NaN, startTime: performance.now() }
     // const plotBaseNumNode: NumNode = plotBase && objPathValue(workerData.display ?? {}, plotBase)
-    if (plotBaseNumNode) {
-      unoptimizedNodes.push(plotBaseNumNode)
-      minimum.push(-Infinity)
-    }
+    // if (plotBaseNumNode) {
+    //   unoptimizedNodes.push(plotBaseNumNode)
+    //   minimum.push(-Infinity)
+    // }
 
     const prepruneArts = arts
     // let nodes = optimize(unoptimizedNodes, workerData, ({ path: [p] }) => p !== "dyn")
-    nodes = pruneExclusion(nodes, artSetExclusion);
-    ({ nodes, arts } = pruneAll(nodes, minimum, arts, maxBuildsToShow, artSetExclusion, {
-      reaffine: true, pruneArtRange: true, pruneNodeRange: true, pruneOrder: true
-    }))
-    nodes = optimize(nodes, {}, _ => false)
+
 
     // const plotBaseNode = plotBaseNumNode ? nodes.pop() : undefined
 
     // const wrap = { buildValues: Array(maxBuildsToShow).fill(0).map(_ => ({ src: "", val: -Infinity })) }
 
-    const filters = nodes
-      .map((value, i) => ({ value, min: minimum[i] }))
-      .filter(x => x.min > -Infinity)
+
 
     console.log('=========== TEST SOLVER BASE ===========')
     // const setup2: OptProblemInput = {
