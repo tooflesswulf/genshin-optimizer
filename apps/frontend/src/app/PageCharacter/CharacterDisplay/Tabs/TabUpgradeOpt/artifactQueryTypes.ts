@@ -1,7 +1,7 @@
 import { SlotKey, Rarity } from "@genshin-optimizer/consts"
 import { SubstatKey } from "@genshin-optimizer/pipeline"
 import { NumNode } from "../../../../Formula/type"
-import { DynStat } from "../TabOptimize/common"
+import { DynStat } from "../../../../Solver/common"
 
 export type GaussianMixture = {
   gmm: {

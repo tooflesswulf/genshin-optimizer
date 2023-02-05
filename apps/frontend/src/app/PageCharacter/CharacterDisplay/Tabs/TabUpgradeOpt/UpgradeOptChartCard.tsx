@@ -3,26 +3,13 @@ import React, { useEffect, useState, useContext, useMemo, useCallback } from 're
 import { DatabaseContext } from '../../../../Database/Database';
 import { DataContext } from '../../../../Context/DataContext';
 import Assets from '../../../../Assets/Assets';
-import {
-  Line,
-  Area,
-  ComposedChart,
-  Legend,
-  ReferenceLine,
-  ReferenceDot,
-  ResponsiveContainer,
-  Tooltip,
-  TooltipProps,
-  XAxis,
-  YAxis,
-  Label,
-} from 'recharts';
+import { Line, Area, ComposedChart, Legend, ReferenceLine, ReferenceDot, ResponsiveContainer, Tooltip, TooltipProps, XAxis, YAxis, Label, } from 'recharts';
 import CardLight from '../../../../Components/Card/CardLight';
 import { QueryResult } from './artifactQueryTypes';
 import { allUpgradeValues } from './artifactUpgradeCrawl'
 import { uiInput as input } from '../../../../Formula';
 import ArtifactCardPico from '../../../../Components/Artifact/ArtifactCardPico'
-import { allSlotKeys, SlotKey } from '../../../../Types/consts';
+import { allSlotKeys, SlotKey } from '@genshin-optimizer/consts';
 import { ICachedArtifact } from '../../../../Types/artifact';
 import { gaussPDF } from './mathUtil'
 

@@ -1,10 +1,10 @@
 import { allSlotKeys } from '@genshin-optimizer/consts';
-import type { Setup } from './EnumerationSolver';
+import type { Setup } from './GOSolver';
 import type { InterimResult } from '../SolverBase'
-import { ArtifactsBySlot, countBuilds, filterArts, RequestFilter} from '../common';
+import { ArtifactsBySlot, countBuilds, filterArts, RequestFilter } from '../common';
+import { SplitWorker } from './BackgroundWorker';
 
-// Splits artifacts in one slot based on their set key. If none are left, split arbitrarily.
-export class ArtSetSplitter {
+export class DefaultSplitWorker implements SplitWorker {
   arts: ArtifactsBySlot
   filters: RequestFilter[] = []
 
@@ -15,13 +15,10 @@ export class ArtSetSplitter {
     this.filters.push(filter)
   }
   split(newThreshold: number, minCount: number) {
-    let filter = this.filters.pop();
-    while (filter) {
-      const count = countBuilds(filterArts(this.arts, filter))
+    while (this.filters.length) {
+      const filter = this.filters.pop()!, count = countBuilds(filterArts(this.arts, filter))
       if (count <= minCount) return filter
       splitBySetOrID(this.arts, filter, minCount).forEach(filter => this.addFilter(filter))
-
-      filter = this.filters.pop()
     }
   }
 }

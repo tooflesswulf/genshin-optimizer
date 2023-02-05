@@ -18,7 +18,6 @@ import { DataContext, dataContextObj } from '../../../../Context/DataContext';
 import { DatabaseContext } from '../../../../Database/Database';
 import { optimize } from '../../../../Formula/optimization';
 import { NumNode } from '../../../../Formula/type';
-import { uiInput as input } from '../../../../Formula/index';
 import useCharacterReducer from '../../../../ReactHooks/useCharacterReducer';
 import useCharSelectionCallback from '../../../../ReactHooks/useCharSelectionCallback';
 import useTeamData, { getTeamData } from '../../../../ReactHooks/useTeamData';
@@ -36,7 +35,7 @@ import MainStatSelectionCard from '../TabOptimize/Components/MainStatSelectionCa
 import { CharacterContext } from '../../../../Context/CharacterContext';
 import ArtifactLevelSlider from '../../../../Components/Artifact/ArtifactLevelSlider';
 import { ICachedArtifact } from '../../../../Types/artifact';
-import { DynStat } from '../TabOptimize/common';
+import { DynStat } from "../../../../Solver/common";
 import useMediaQueryUp from '../../../../ReactHooks/useMediaQueryUp';
 
 

@@ -30,9 +30,8 @@ import useMediaQueryUp from '../../../../ReactHooks/useMediaQueryUp';
 import useTeamData, { getTeamData } from '../../../../ReactHooks/useTeamData';
 import { CharacterKey, charKeyToLocCharKey, LocationCharacterKey } from '../../../../Types/consts';
 import { objPathValue, range } from '../../../../Util/Util';
-import { FinalizeResult, Setup, WorkerCommand, WorkerResult } from './BackgroundWorker';
 import { maxBuildsToShowList } from './Build';
-import { artSetPerm, Build, filterFeasiblePerm, mergeBuilds, mergePlot, pruneAll, pruneExclusion, RequestFilter } from './common';
+import { Build, mergeBuilds, mergePlot } from '../../../../Solver/common';
 import ArtifactSetConfig from './Components/ArtifactSetConfig';
 import AssumeFullLevelToggle from './Components/AssumeFullLevelToggle';
 import BonusStatsCard from './Components/BonusStatsCard';
@@ -52,7 +51,7 @@ import NotificationsOffIcon from '@mui/icons-material/NotificationsOff';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 
 import { OptProblemInput, SolverBase } from '../../../../Solver/SolverBase';
-import { EnumerationSolver } from '../../../../Solver/EnumerationSolver/EnumerationSolver';
+import { EnumerationSolver } from '../../../../Solver/GOSolver/GOSolver';
 
 const audio = new Audio("notification.mp3")
 export default function TabBuild() {
@@ -196,19 +195,12 @@ export default function TabBuild() {
       minimum.push(-Infinity)
     }
 
-    // let arts = split
-
     const nodes = optimize(unoptimizedNodes, workerData, ({ path: [p] }) => p !== "dyn")
     const plotBaseNode = plotBaseNumNode ? nodes.pop() : undefined
     const optimizationTargetNode = nodes.pop()
     if (!optimizationTargetNode) throw Error('Nodes are empty.')
 
-    // nodes = pruneExclusion(nodes, artSetExclusion);
-    // ({ nodes, arts } = pruneAll(nodes, minimum, arts, maxBuildsToShow, artSetExclusion, {
-    //   reaffine: true, pruneArtRange: true, pruneNodeRange: true, pruneOrder: true
-    // }))
-    // nodes = optimize(nodes, {}, _ => false)
-
+    // BEGIN Solver
     const baseProblem: OptProblemInput = {
       arts: split, optimizationTarget: optimizationTargetNode,
       artSet: artSetExclusion, constraints: nodes.map((value, i) => ({ value, min: minimum[i] })),
@@ -226,195 +218,17 @@ export default function TabBuild() {
     solver.onSuccess(() => {
       setTimeout(() => {
         // Using a ref because a user can cancel the notification while the build is going.
-        if (results) {
-          if (notificationRef.current) {
-            audio.play()
-            if (!tabFocused.current) window.alert(t`buildCompleted`)
-          }
+        if (results && notificationRef.current) {
+          audio.play()
+          if (!tabFocused.current) window.alert(t`buildCompleted`)
         }
       }, 100)
     })
     const buildTimer = setInterval(() => setBuildStatus({ type: "active", ...solver.computeStatus }), 100)
 
     const results = await solver.solve()
+    // END Solver
 
-
-
-    // const setPerms = filterFeasiblePerm(artSetPerm(artSetExclusion, Object.values(split.values).flatMap(x => x.map(x => x.set!))), split)
-
-    // const status: Omit<BuildStatus, "type"> = { tested: 0, failed: 0, skipped: 0, total: NaN, startTime: performance.now() }
-    // const plotBaseNumNode: NumNode = plotBase && objPathValue(workerData.display ?? {}, plotBase)
-    // if (plotBaseNumNode) {
-    //   unoptimizedNodes.push(plotBaseNumNode)
-    //   minimum.push(-Infinity)
-    // }
-
-    // const prepruneArts = arts
-    // let nodes = optimize(unoptimizedNodes, workerData, ({ path: [p] }) => p !== "dyn")
-
-
-    // const plotBaseNode = plotBaseNumNode ? nodes.pop() : undefined
-
-    // const wrap = { buildValues: Array(maxBuildsToShow).fill(0).map(_ => ({ src: "", val: -Infinity })) }
-
-
-
-    // console.log('=========== TEST SOLVER BASE ===========')
-    // const setup2: OptProblemInput = {
-    //   arts, optimizationTarget: optimizationTargetNode,
-    //   constraints: filters, artSet: artSetExclusion,
-
-    //   topN: maxBuildsToShow, plotBase: plotBaseNode,
-    //   numWorkers: maxWorkers,
-    // }
-    // const solver: SolverBase<unknown, { command: string }> = new EnumerationSolver(setup2)
-
-    // cancelled.then(() => solver.cancel())
-    // solver.onWorkerError(e => {
-    //   console.log('Failed to load worker')
-    //   console.log(e)
-    //   setWorkerErr(true)
-    //   cancelToken.current()
-    // })
-    // solver.onSuccess(() => {
-    //   setTimeout(() => {
-    //     // Using a ref because a user can cancel the notification while the build is going.
-    //     if (results) {
-    //       if (notificationRef.current) {
-    //         audio.play()
-    //         if (!tabFocused.current) window.alert(t`buildCompleted`)
-    //       }
-    //     }
-    //   }, 100)
-    // })
-    // const buildTimer = setInterval(() => setBuildStatus({ type: "active", ...solver.computeStatus }), 100)
-
-    // const results = await solver.solve()
-    // console.log('=========== END TEST SOLVER BASE ===========')
-
-    // const minFilterCount = 16_000_000, maxRequestFilterInFlight = maxWorkers * 16
-    // const unprunedFilters = setPerms[Symbol.iterator](), requestFilters: RequestFilter[] = []
-    // const idleWorkers: number[] = [], splittingWorkers = new Set<number>()
-    // const workers: Worker[] = []
-
-    // function getThreshold(): number {
-    //   return wrap.buildValues[maxBuildsToShow - 1].val
-    // }
-    // function fetchContinueWork(): WorkerCommand {
-    //   return { command: "split", filter: undefined, minCount: minFilterCount, threshold: getThreshold() }
-    // }
-    // function fetchPruningWork(): WorkerCommand | undefined {
-    //   const { done, value } = unprunedFilters.next()
-    //   return done ? undefined : {
-    //     command: "split", minCount: minFilterCount,
-    //     threshold: getThreshold(), filter: value,
-    //   }
-    // }
-    // function fetchRequestWork(): WorkerCommand | undefined {
-    //   const filter = requestFilters.pop()
-    //   return !filter ? undefined : {
-    //     command: "iterate",
-    //     threshold: getThreshold(), filter
-    //   }
-    // }
-
-    // const finalizedList: Promise<FinalizeResult>[] = []
-    // for (let i = 0; i < maxWorkers; i++) {
-    //   const worker = new Worker(new URL('./BackgroundWorker.ts', import.meta.url))
-    //   worker.addEventListener("error", _ => {
-    //     console.error("Failed to load worker")
-    //     setWorkerErr(true)
-    //     cancelToken.current()
-    //   });
-
-    //   const setup: Setup = {
-    //     command: "setup",
-    //     id: i, arts,
-    //     optimizationTarget: optimizationTargetNode,
-    //     plotBase: plotBaseNode,
-    //     maxBuilds: maxBuildsToShow,
-    //     filters
-    //   }
-    //   worker.postMessage(setup, undefined)
-    //   if (i === 0) {
-    //     const countCommand: WorkerCommand = { command: "count", exclusion: artSetExclusion, arts: [arts, prepruneArts] }
-    //     worker.postMessage(countCommand, undefined)
-    //   }
-    //   let finalize: (_: FinalizeResult) => void
-    //   const finalized = new Promise<FinalizeResult>(r => finalize = r)
-    //   worker.onmessage = async ({ data }: { data: { id: number } & WorkerResult }) => {
-    //     setWorkerErr(false)
-    //     switch (data.command) {
-    //       case "interim":
-    //         status.tested += data.tested
-    //         status.failed += data.failed
-    //         status.skipped += data.skipped
-    //         if (data.buildValues) {
-    //           wrap.buildValues = wrap.buildValues.filter(({ src }) => src !== data.source)
-    //           wrap.buildValues.push(...data.buildValues.map(val => ({ src: data.source, val })))
-    //           wrap.buildValues.sort((a, b) => b.val - a.val).splice(maxBuildsToShow)
-    //         }
-    //         break
-    //       case "split":
-    //         if (data.filter) {
-    //           requestFilters.push(data.filter)
-    //           splittingWorkers.add(data.id)
-    //         } else splittingWorkers.delete(data.id)
-    //         idleWorkers.push(data.id)
-    //         break
-    //       case "iterate":
-    //         idleWorkers.push(data.id)
-    //         break
-    //       case "finalize":
-    //         worker.terminate()
-    //         finalize(data);
-
-    //         // Using a timeout because when an alert is displayed, the UI doesnt update, showing an incomplete loading bar
-    //         setTimeout(() => {
-    //           // Using a ref because a user can cancel the notification while the build is going.
-    //           if (notificationRef.current) {
-    //             audio.play()
-    //             if (!tabFocused.current)
-    //               window.alert(t`buildCompleted`)
-    //           }
-    //         }, 100);
-    //         return
-    //       case "count":
-    //         const [pruned, prepruned] = data.counts
-    //         status.total = prepruned
-    //         status.skipped += prepruned - pruned
-    //         return
-    //       default: console.log("DEBUG", data)
-    //     }
-    //     while (idleWorkers.length) {
-    //       const id = idleWorkers.pop()!, worker = workers[id]
-    //       let work: WorkerCommand | undefined
-    //       if (requestFilters.length < maxRequestFilterInFlight) {
-    //         work = fetchPruningWork()
-    //         if (!work && splittingWorkers.has(id)) work = fetchContinueWork()
-    //       }
-    //       if (!work) work = fetchRequestWork()
-    //       if (work) worker.postMessage(work)
-    //       else {
-    //         idleWorkers.push(id)
-    //         if (idleWorkers.length === 4 * maxWorkers) {
-    //           const command: WorkerCommand = { command: "finalize" }
-    //           workers.forEach(worker => worker.postMessage(command))
-    //         }
-    //         break
-    //       }
-    //     }
-    //   }
-
-    //   workers.push(worker)
-    //   cancelled.then(() => worker.terminate())
-    //   finalizedList.push(finalized)
-    // }
-    // for (let i = 0; i < 3; i++)
-    //   idleWorkers.push(...range(0, maxWorkers - 1))
-
-    // const buildTimer = setInterval(() => setBuildStatus({ type: "active", ...status }), 100)
-    // const results = await Promise.any([Promise.all(finalizedList), cancelled])
     clearInterval(buildTimer)
     cancelToken.current = () => { }
 

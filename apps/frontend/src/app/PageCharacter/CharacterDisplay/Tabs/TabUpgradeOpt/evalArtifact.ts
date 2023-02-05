@@ -1,7 +1,7 @@
 import { SubstatKey, allSubstatKeys } from "../../../../Types/artifact"
 import { allArtifactSets } from "@genshin-optimizer/consts"
 import Artifact from "../../../../Data/Artifacts/Artifact"
-import { DynStat } from '../TabOptimize/common'
+import { DynStat } from "../../../../Solver/common"
 
 import { GaussianMixture, Query, QueryArtifact, QueryBuild, QueryResult } from "./artifactQueryTypes"
 import { crawlUpgrades } from "./artifactUpgradeCrawl"

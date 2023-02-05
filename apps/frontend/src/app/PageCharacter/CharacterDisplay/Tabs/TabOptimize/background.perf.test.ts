@@ -5,8 +5,8 @@ import { optimize } from '../../../../Formula/optimization';
 import { customRead } from '../../../../Formula/utils';
 import { getTeamData } from '../../../../ReactHooks/useTeamData';
 import * as data1 from "./background.perf.test.json";
-import { countBuilds, pruneAll } from './common';
-import { ComputeWorker } from './ComputeWorker';
+import { countBuilds, pruneAll } from '../../../../Solver/common';
+import { ComputeWorker } from '../../../../Solver/GOSolver/ComputeWorker';
 import { compactArtifacts, dynamicData } from './foreground';
 
 describe.skip("Worker Perf", () => {

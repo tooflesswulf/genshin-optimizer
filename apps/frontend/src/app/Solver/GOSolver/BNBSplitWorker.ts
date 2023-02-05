@@ -6,7 +6,7 @@ import { SlotKey } from "@genshin-optimizer/consts";
 import { assertUnreachable, objectKeyValueMap, objectMap } from "../../Util/Util";
 import type { SplitWorker } from "./BackgroundWorker";
 import type { InterimResult } from "../SolverBase";
-import type { Setup } from "./EnumerationSolver";
+import type { Setup } from "./GOSolver";
 import { ArtifactBuildData, ArtifactsBySlot, computeFullArtRange, computeNodeRange, countBuilds, DynStat, filterArts, MinMax, pruneAll, RequestFilter } from "../common";
 
 type Approximation = {
