@@ -1,6 +1,6 @@
 import { ArtSetExclusion } from "../../Database/DataManagers/BuildSettingData"
-import { OptNode } from "../../Formula/optimization"
-import { ArtifactsBySlot, Build, PlotData, RequestFilter, artSetPerm, filterFeasiblePerm } from "../common"
+import { OptNode, optimize } from "../../Formula/optimization"
+import { ArtifactsBySlot, Build, PlotData, RequestFilter, artSetPerm, filterFeasiblePerm, pruneAll, pruneExclusion } from "../common"
 import { SolverBase, SourcedInterimResult, FinalizeResult, OptProblemInput } from "../SolverBase"
 
 export class EnumerationSolver extends SolverBase<WorkerCommand, WorkerResult> {
@@ -24,9 +24,28 @@ export class EnumerationSolver extends SolverBase<WorkerCommand, WorkerResult> {
   }
 
   preprocess(input: OptProblemInput): OptProblemInput {
-    // TODO: implement
+    let pb = input.plotBase
     const filters = input.constraints.filter((x) => x.min > -Infinity)
-    return { ...input, constraints: filters }
+
+    let nodes = [...filters.map(({ value }) => value), input.optimizationTarget]
+    const minimums = [...filters.map(({ min }) => min), -Infinity]
+    if (input.plotBase) {
+      nodes.push(input.plotBase)
+      minimums.push(-Infinity)
+    }
+
+    nodes = pruneExclusion(nodes, input.artSet)
+    const newNodesArts = pruneAll(nodes, minimums, input.arts, input.topN, input.artSet,
+      { reaffine: true, pruneArtRange: true, pruneNodeRange: true, pruneOrder: true })
+
+    nodes = newNodesArts.nodes
+    nodes = optimize(nodes, {}, _ => false)
+
+    if (input.plotBase) pb = nodes.pop()
+    const newOptTarget = nodes.pop()
+    if (!newOptTarget) throw Error('Nodes are empty.')
+
+    return { ...input, arts: newNodesArts.arts, optimizationTarget: newOptTarget, plotBase: pb, constraints: nodes.map((value, i) => ({value, min: minimums[i]})) }
   }
 
   protected splittingWorkers = new Set<number>()

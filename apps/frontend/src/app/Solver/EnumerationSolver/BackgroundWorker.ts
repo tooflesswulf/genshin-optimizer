@@ -1,10 +1,11 @@
-import { artSetPerm, countBuilds, filterArts, filterFeasiblePerm } from "../common"
+import { RequestFilter, artSetPerm, countBuilds, filterArts, filterFeasiblePerm } from "../common"
 import { assertUnreachable } from "../../Util/Util"
 import { WorkerCommand, WorkerResult } from "./EnumerationSolver"
 import { ArtSetSplitter } from "./ArtSetSplitter"
 import { Enumerator } from "./Enumerator"
+import { BNBSplitWorker } from "./BNBSplitter"
 
-let id: number, splitter: ArtSetSplitter, computeWorker: Enumerator;
+let id: number, splitter: SplitWorker, computeWorker: Enumerator;
 
 onmessage = ({ data }: { data: WorkerCommand }) => {
   const { command } = data;
@@ -12,20 +13,22 @@ onmessage = ({ data }: { data: WorkerCommand }) => {
   switch (command) {
     case 'setup': {
       id = data.id;
-      const splitID = `split${id}`,
-        computeID = `compute${id}`;
-      splitter = new ArtSetSplitter(data, (interim) =>
-        postMessage({ id, source: splitID, ...interim })
-      );
-      computeWorker = new Enumerator(data, (interim) =>
-        postMessage({ id, source: computeID, ...interim })
-      );
+      const splitID = `split${id}`, computeID = `compute${id}`;
+      try {
+        splitter = new BNBSplitWorker(data, interim => postMessage({ id, source: splitID, ...interim }))
+        console.log('Using bnb splitter')
+      } catch {
+        splitter = new ArtSetSplitter(data, (interim) => postMessage({ id, source: splitID, ...interim }))
+        console.log('Using default splitter')
+      }
+
+      computeWorker = new Enumerator(data, (interim) => postMessage({ id, source: computeID, ...interim }))
       result = { command: 'iterate', id };
       break;
     }
     case 'split': {
       if (data.filter) splitter.addFilter(data.filter);
-      const filter = splitter.split(data.minCount);
+      const filter = splitter.split(data.threshold, data.minCount);
       result = { command: 'split', filter, id };
       break;
     }
@@ -64,4 +67,9 @@ onmessage = ({ data }: { data: WorkerCommand }) => {
       assertUnreachable(command);
   }
   postMessage({ ...result });
-};
+}
+
+export interface SplitWorker {
+  addFilter(filter: RequestFilter): void
+  split(newThreshold: number, minCount: number): RequestFilter | undefined
+}

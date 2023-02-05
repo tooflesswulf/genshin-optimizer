@@ -2,7 +2,6 @@ import { OptNode } from "../Formula/optimization";
 import { ArtifactsBySlot, Build, PlotData } from "./common";
 import { ArtSetExclusion } from "../Database/DataManagers/BuildSettingData";
 import { BuildStatus } from "../PageCharacter/CharacterDisplay/Tabs/TabOptimize/Components/BuildAlert";
-import { range } from '../Util/Util'
 
 export type OptProblemInput = {
   arts: ArtifactsBySlot

@@ -14,7 +14,7 @@ export class ArtSetSplitter {
   addFilter(filter: RequestFilter) {
     this.filters.push(filter)
   }
-  split(minCount: number) {
+  split(newThreshold: number, minCount: number) {
     let filter = this.filters.pop();
     while (filter) {
       const count = countBuilds(filterArts(this.arts, filter))
