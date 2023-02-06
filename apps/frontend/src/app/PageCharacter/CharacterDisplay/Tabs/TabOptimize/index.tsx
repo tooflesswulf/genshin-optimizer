@@ -49,9 +49,8 @@ import useBuildResult from './useBuildResult';
 import useBuildSetting from './useBuildSetting';
 import NotificationsOffIcon from '@mui/icons-material/NotificationsOff';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
-
 import { OptProblemInput, SolverBase } from '../../../../Solver/SolverBase';
-import { EnumerationSolver } from '../../../../Solver/GOSolver/GOSolver';
+import { GOSolver } from '../../../../Solver/GOSolver/GOSolver';
 
 const audio = new Audio("notification.mp3")
 export default function TabBuild() {
@@ -200,14 +199,13 @@ export default function TabBuild() {
     const optimizationTargetNode = nodes.pop()
     if (!optimizationTargetNode) throw Error('Nodes are empty.')
 
-    // BEGIN Solver
     const baseProblem: OptProblemInput = {
       arts: split, optimizationTarget: optimizationTargetNode,
       artSet: artSetExclusion, constraints: nodes.map((value, i) => ({ value, min: minimum[i] })),
 
       topN: maxBuildsToShow, plotBase: plotBaseNode, numWorkers: maxWorkers
     }
-    const solver: SolverBase<unknown, { command: string }> = new EnumerationSolver(baseProblem)
+    const solver: SolverBase<unknown, { command: string }> = new GOSolver(baseProblem)
     cancelled.then(() => solver.cancel())
     solver.onWorkerError(e => {
       console.log('Failed to load worker')
@@ -227,7 +225,6 @@ export default function TabBuild() {
     const buildTimer = setInterval(() => setBuildStatus({ type: "active", ...solver.computeStatus }), 100)
 
     const results = await solver.solve()
-    // END Solver
 
     clearInterval(buildTimer)
     cancelToken.current = () => { }

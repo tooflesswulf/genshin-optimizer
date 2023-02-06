@@ -1,10 +1,9 @@
-/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { ArtSetExclusion } from "../Database/DataManagers/BuildSettingData";
 import { forEachNodes, mapFormulas } from "../Formula/internal";
 import { allOperations, constantFold, OptNode } from "../Formula/optimization";
-import { ConstantNode, Data } from "../Formula/type";
+import { ConstantNode } from "../Formula/type";
 import { constant, customRead, max, min, threshold } from "../Formula/utils";
-import { allSlotKeys, ArtifactSetKey, SlotKey } from "@genshin-optimizer/consts";
+import { allSlotKeys, ArtifactSetKey, SlotKey } from "../Types/consts";
 import { assertUnreachable, objectKeyMap, objectMap, range } from "../Util/Util";
 
 type MicropassOperation = "reaffine" | "pruneArtRange" | "pruneNodeRange" | "pruneOrder"
@@ -71,7 +70,7 @@ export function pruneExclusion(nodes: OptNode[], exclusion: ArtSetExclusion): Op
       if (key in maxValues) {
         const max: number = maxValues[key]
         if (max < thres) return fail
-        if (thres === 2 && exclusion[key].includes(2))
+        if (thres === 2 && exclusion[key]!.includes(2))
           return threshold(v, 4, pass, fail)
       }
     }
@@ -89,7 +88,6 @@ function reaffine(nodes: OptNode[], arts: ArtifactsBySlot, forceRename = false):
 
   const dynKeys = new Set<string>()
 
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
   forEachNodes(nodes, _ => { }, f => {
     const { operation } = f
     switch (operation) {
@@ -131,7 +129,7 @@ function reaffine(nodes: OptNode[], arts: ArtifactsBySlot, forceRename = false):
   function reaffineArt(stat: DynStat): DynStat {
     const values = constantFold([...affineMap.keys()], {
       dyn: objectMap(stat, (value) => constant(value))
-    } as Data, _ => true)
+    } as any, _ => true)
     return Object.fromEntries([...affineMap.values()].map((v, i) => [v.path[1], (values[i] as ConstantNode<number>).value]))
   }
   const result = {
@@ -183,7 +181,6 @@ function pruneOrder(arts: ArtifactsBySlot, numTop: number, exclusion: ArtSetExcl
 function pruneArtRange(nodes: OptNode[], arts: ArtifactsBySlot, minimum: number[]): ArtifactsBySlot {
   const baseRange = Object.fromEntries(Object.entries(arts.base).map(([key, x]) => [key, { min: x, max: x }]))
   const wrap = { arts }
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     const artRanges = objectKeyMap(allSlotKeys, slot => computeArtRange(wrap.arts.values[slot]))
     const otherArtRanges = objectKeyMap(allSlotKeys, key =>
@@ -285,7 +282,6 @@ export function computeFullArtRange(arts: ArtifactsBySlot): DynMinMax {
 export function computeNodeRange(nodes: OptNode[], reads: DynMinMax): Map<OptNode, MinMax> {
   const range = new Map<OptNode, MinMax>()
 
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
   forEachNodes(nodes, _ => { }, f => {
     const { operation } = f
     const operands = f.operands.map(op => range.get(op)!)
@@ -357,8 +353,7 @@ export function mergeBuilds(builds: Build[][], maxNum: number): Build[] {
   return builds.flatMap(x => x).sort((a, b) => b.value - a.value).slice(0, maxNum)
 }
 export function mergePlot(plots: PlotData[]): PlotData {
-  let scale = 0.01
-  const reductionScaling = 2, maxCount = 1500
+  let scale = 0.01, reductionScaling = 2, maxCount = 1500
   let keys = new Set(plots.flatMap(x => Object.values(x).map(v => Math.round(v.plot! / scale))))
   while (keys.size > maxCount) {
     scale *= reductionScaling
@@ -456,8 +451,7 @@ export function* artSetPerm(exclusion: ArtSetExclusion, _artSets: ArtifactSetKey
 
   function* check(shape: number[]) {
     const used: Set<ArtifactSetKey> = new Set()
-    let groupped: number[][] = []
-    const rainbows: number[] = []
+    let groupped: number[][] = [], rainbows: number[] = []
     for (const i of shape) {
       groupped.push([])
       if (i === 5) rainbows.push(groupped.length - 1)

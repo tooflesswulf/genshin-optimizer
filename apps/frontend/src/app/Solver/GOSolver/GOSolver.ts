@@ -1,9 +1,9 @@
 import { ArtSetExclusion } from "../../Database/DataManagers/BuildSettingData"
 import { OptNode, optimize } from "../../Formula/optimization"
-import { ArtifactsBySlot, Build, PlotData, RequestFilter, artSetPerm, filterFeasiblePerm, pruneAll, pruneExclusion } from "../common"
+import { ArtifactsBySlot, RequestFilter, artSetPerm, filterFeasiblePerm, pruneAll, pruneExclusion } from "../common"
 import { SolverBase, SourcedInterimResult, FinalizeResult, OptProblemInput } from "../SolverBase"
 
-export class EnumerationSolver extends SolverBase<WorkerCommand, WorkerResult> {
+export class GOSolver extends SolverBase<WorkerCommand, WorkerResult> {
   protected makeWorker(): Worker { return new Worker(new URL('./BackgroundWorker.ts', import.meta.url)) }
   protected startWorkers(): void {
     for (let i = 0; i < this.numWorkers; i++) {
@@ -53,7 +53,7 @@ export class EnumerationSolver extends SolverBase<WorkerCommand, WorkerResult> {
   constructor(input: OptProblemInput) {
     super(input)
 
-    // Initialization for EnumerationSolver.
+    // Initialization for GOSolver.
     const setPerms = filterFeasiblePerm(artSetPerm(this.artSetExcl, Object.values(this.arts.values).flatMap(x => x.map(x => x.set!))), this.arts)
     this.unprunedFilters = setPerms[Symbol.iterator]()
     this.requestFilters = []
@@ -77,7 +77,6 @@ export class EnumerationSolver extends SolverBase<WorkerCommand, WorkerResult> {
       case "count": {
         const [pruned] = result.counts
         this.computeStatus.total = pruned
-        // this.computeStatus.skipped += prepruned - pruned
         break
       }
       default:

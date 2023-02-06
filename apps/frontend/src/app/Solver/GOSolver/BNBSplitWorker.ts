@@ -2,11 +2,9 @@ import { customMapFormula, forEachNodes } from "../../Formula/internal";
 import { allOperations, OptNode } from "../../Formula/optimization";
 import { ConstantNode } from "../../Formula/type";
 import { prod, threshold } from "../../Formula/utils";
-import { SlotKey } from "@genshin-optimizer/consts";
+import { SlotKey } from "../../Types/consts";
 import { assertUnreachable, objectKeyValueMap, objectMap } from "../../Util/Util";
-import type { SplitWorker } from "./BackgroundWorker";
-import type { InterimResult } from "../SolverBase";
-import type { Setup } from "./GOSolver";
+import type { InterimResult, Setup, SplitWorker } from "./BackgroundWorker";
 import { ArtifactBuildData, ArtifactsBySlot, computeFullArtRange, computeNodeRange, countBuilds, DynStat, filterArts, MinMax, pruneAll, RequestFilter } from "../common";
 
 type Approximation = {

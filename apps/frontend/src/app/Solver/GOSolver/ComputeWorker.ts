@@ -1,6 +1,5 @@
 import { optimize, OptNode, precompute } from '../../Formula/optimization';
-import type { Setup } from './GOSolver';
-import type { InterimResult } from '../SolverBase';
+import type { InterimResult, Setup } from './BackgroundWorker';
 import { ArtifactBuildData, ArtifactsBySlot, Build, countBuilds, filterArts, mergePlot, PlotData, pruneAll, RequestFilter } from '../common';
 
 export class ComputeWorker {

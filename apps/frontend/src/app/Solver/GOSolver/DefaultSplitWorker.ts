@@ -1,8 +1,6 @@
 import { allSlotKeys } from '@genshin-optimizer/consts';
-import type { Setup } from './GOSolver';
-import type { InterimResult } from '../SolverBase'
+import type { InterimResult, Setup, SplitWorker } from './BackgroundWorker';
 import { ArtifactsBySlot, countBuilds, filterArts, RequestFilter } from '../common';
-import { SplitWorker } from './BackgroundWorker';
 
 export class DefaultSplitWorker implements SplitWorker {
   arts: ArtifactsBySlot
@@ -14,7 +12,7 @@ export class DefaultSplitWorker implements SplitWorker {
   addFilter(filter: RequestFilter) {
     this.filters.push(filter)
   }
-  split(newThreshold: number, minCount: number) {
+  split(_newThreshold: number, minCount: number) {
     while (this.filters.length) {
       const filter = this.filters.pop()!, count = countBuilds(filterArts(this.arts, filter))
       if (count <= minCount) return filter
