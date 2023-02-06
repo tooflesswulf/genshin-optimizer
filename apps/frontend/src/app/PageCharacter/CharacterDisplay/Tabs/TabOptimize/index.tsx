@@ -196,8 +196,7 @@ export default function TabBuild() {
 
     const nodes = optimize(unoptimizedNodes, workerData, ({ path: [p] }) => p !== "dyn")
     const plotBaseNode = plotBaseNumNode ? nodes.pop() : undefined
-    const optimizationTargetNode = nodes.pop()
-    if (!optimizationTargetNode) throw Error('Nodes are empty.')
+    const optimizationTargetNode = nodes.pop()!
 
     const baseProblem: OptProblemInput = {
       arts: split, optimizationTarget: optimizationTargetNode,
