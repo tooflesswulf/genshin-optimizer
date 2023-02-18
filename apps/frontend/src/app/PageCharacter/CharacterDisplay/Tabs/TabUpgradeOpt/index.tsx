@@ -12,7 +12,7 @@ import OptimizationTargetSelector from '../TabOptimize/Components/OptimizationTa
 import ArtifactSetConfig from '../TabOptimize/Components/ArtifactSetConfig';
 import useDBMeta from '../../../../ReactHooks/useDBMeta';
 
-import React, { Suspense, useCallback, useContext, useMemo, useRef, useState } from 'react';
+import React, { Suspense, useCallback, useContext, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { Trans } from "react-i18next";
 import { DataContext, dataContextObj } from '../../../../Context/DataContext';
 import { DatabaseContext } from '../../../../Database/Database';
@@ -37,6 +37,9 @@ import ArtifactLevelSlider from '../../../../Components/Artifact/ArtifactLevelSl
 import { ICachedArtifact } from '../../../../Types/artifact';
 import { DynStat } from "../../../../Solver/common";
 import useMediaQueryUp from '../../../../ReactHooks/useMediaQueryUp';
+import { LocationCharacterKey, charKeyToLocCharKey } from '@genshin-optimizer/consts';
+import useForceUpdate from '../../../../ReactHooks/useForceUpdate';
+import { defThreads } from '../../../../Database/DataEntries/DisplayOptimizeEntry';
 
 
 export default function TabUpopt() {
@@ -54,6 +57,46 @@ export default function TabUpopt() {
   const teamData = useTeamData(characterKey)
   const { characterSheet, target: data } = teamData?.[characterKey as CharacterKey] ?? {}
   const isSM = ["xs", "sm"].includes(useMediaQueryUp())
+
+  const [artsDirty, setArtsDirty] = useForceUpdate()
+  const [{ equipmentPriority, threads = defThreads }, setDisplayOptimize] = useState(database.displayOptimize.get())
+  useEffect(() => database.displayOptimize.follow((_r, to) => setDisplayOptimize(to)), [database, setDisplayOptimize])
+  const deferredArtsDirty = useDeferredValue(artsDirty)
+  const deferredBuildSetting = useDeferredValue(buildSetting)
+  const { filteredArts, numExcludedUsed, numEquippedUsed } = useMemo(() => {
+    const { mainStatKeys, useExcludedArts, useEquippedArts, levelLow, levelHigh } = deferredArtsDirty && deferredBuildSetting
+    const cantTakeList: Set<LocationCharacterKey> = new Set()
+    if (useEquippedArts) {
+      const index = equipmentPriority.indexOf(characterKey)
+      if (index < 0) equipmentPriority.forEach(ek => cantTakeList.add(charKeyToLocCharKey(ek)))
+      else equipmentPriority.slice(0, index).forEach(ek => cantTakeList.add(charKeyToLocCharKey(ek)))
+    }
+    let numExcludedUsed = 0, numEquippedUsed = 0
+    const filteredArts = database.arts.values.filter(art => {
+      if (art.level < levelLow) return false
+      if (art.level > levelHigh) return false
+      const mainStats = mainStatKeys[art.slotKey]
+      if (mainStats?.length && !mainStats.includes(art.mainStatKey)) return false
+
+      // If its equipped on the selected character, bypass the check
+      const locKey = charKeyToLocCharKey(characterKey)
+      if (art.location !== locKey) {
+        if (art.location && !useEquippedArts) return false
+        if (art.location && useEquippedArts && cantTakeList.has(art.location)) return false
+      }
+
+      if (art.exclude) {
+        numExcludedUsed++
+        if (!useExcludedArts) return false
+      }
+
+      if (art.location && art.location !== locKey) numEquippedUsed++
+      return true
+    })
+
+    return { filteredArts, numExcludedUsed, numEquippedUsed }
+  }, [database, characterKey, equipmentPriority, deferredArtsDirty, deferredBuildSetting])
+  const filteredArtIdMap = useMemo(() => objectKeyMap(filteredArts.map(({ id }) => id), _ => true), [filteredArts])
 
   const [artifactUpgradeOpts, setArtifactUpgradeOpts] = useState(undefined as UpgradeOptResult | undefined)
 
@@ -269,7 +312,7 @@ export default function TabUpopt() {
                   disabled={false}
                 />
                 <CardContent>
-                  <MainStatSelectionCard disabled={false} filteredArtIds={[]} />
+                  <MainStatSelectionCard disabled={false} filteredArtIdMap={filteredArtIdMap} />
                 </CardContent>
               </CardLight>
               }

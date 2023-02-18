@@ -1,4 +1,4 @@
-import { SlotKey, Rarity } from "@genshin-optimizer/consts"
+import { ArtifactSlotKey, RarityKey } from "@genshin-optimizer/consts"
 import { SubstatKey } from "@genshin-optimizer/pipeline"
 import { NumNode } from "../../../../Formula/type"
 import { DynStat } from "../../../../Solver/common"
@@ -45,12 +45,12 @@ type StructuredNumber = {
 export type QueryArtifact = {
   id: string,
   level: number,
-  rarity: Rarity,
-  slot: SlotKey,
+  rarity: RarityKey,
+  slot: ArtifactSlotKey,
   values: DynStat,
   subs: SubstatKey[]
 }
-export type QueryBuild = { [key in SlotKey]: QueryArtifact | undefined }
+export type QueryBuild = { [key in ArtifactSlotKey]: QueryArtifact | undefined }
 export type UpgradeOptResult = {
   query: Query,
   arts: QueryResult[],

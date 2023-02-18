@@ -9,7 +9,7 @@ import { QueryResult } from './artifactQueryTypes';
 import { allUpgradeValues } from './artifactUpgradeCrawl'
 import { uiInput as input } from '../../../../Formula';
 import ArtifactCardPico from '../../../../Components/Artifact/ArtifactCardPico'
-import { allSlotKeys, SlotKey } from '@genshin-optimizer/consts';
+import { allArtifactSlotKeys, ArtifactSlotKey } from '@genshin-optimizer/consts';
 import { ICachedArtifact } from '../../../../Types/artifact';
 import { gaussPDF } from './mathUtil'
 
@@ -55,8 +55,8 @@ export default function UpgradeOptChartCard({ upgradeOpt, objMin, objMax }: Data
   const slot = bla.slotKey;
   const { data } = useContext(DataContext)
   const artifacts = useMemo(() =>
-    allSlotKeys.map(k => [k, database.arts.get(data.get(input.art[k].id).value ?? "")]),
-    [data, database]) as Array<[SlotKey, ICachedArtifact | undefined]>;
+    allArtifactSlotKeys.map(k => [k, database.arts.get(data.get(input.art[k].id).value ?? "")]),
+    [data, database]) as Array<[ArtifactSlotKey, ICachedArtifact | undefined]>;
 
   const gauss = (x: number) => upgradeOpt.distr.gmm.reduce(
     (pv, { phi, mu, sig2 }) => pv + phi * gaussPDF(x, mu, sig2), 0)
@@ -187,7 +187,7 @@ export default function UpgradeOptChartCard({ upgradeOpt, objMin, objMax }: Data
       </ResponsiveContainer>
 
       <Grid direction="row" container spacing={0.75} columns={12}>
-        {artifacts.map(([sk, art]: [SlotKey, ICachedArtifact | undefined]) => {
+        {artifacts.map(([sk, art]: [ArtifactSlotKey, ICachedArtifact | undefined]) => {
           if (sk !== slot)
             return <Grid item key={`${sk}_${upgradeOpt.id}`} xs={1}><ArtifactCardPico slotKey={sk} artifactObj={art} /></Grid>
           return <Grid item key={`${sk}_${upgradeOpt.id}`} xs={1}><Button variant='contained' style={{ height: "100%", width: '100%' }}

@@ -1,5 +1,5 @@
 import { SubstatKey, allSubstatKeys } from "../../../../Types/artifact"
-import { allArtifactSets } from "@genshin-optimizer/consts"
+import { allArtifactSetKeys } from "@genshin-optimizer/consts"
 import Artifact from "../../../../Data/Artifacts/Artifact"
 import { DynStat } from "../../../../Solver/common"
 
@@ -76,7 +76,7 @@ export function evalArtifact(objective: Query, art: QueryArtifact, slow = false,
     }
   }
   else {
-    const msOption = Object.keys(art.values).filter(v => !(art.subs as string[]).includes(v)).filter(v => !(allArtifactSets as readonly string[]).includes(v))
+    const msOption = Object.keys(art.values).filter(v => !(art.subs as string[]).includes(v)).filter(v => !(allArtifactSetKeys as readonly string[]).includes(v))
     if (msOption.length !== 1) throw Error('Failed to extract artifact main stat')
     const mainStat = msOption[0]
 
