@@ -1,4 +1,7 @@
+import { CharacterKey, charKeyToLocCharKey, LocationCharacterKey } from '@genshin-optimizer/consts';
 import { CheckBox, CheckBoxOutlineBlank, Close, DeleteForever, Science, TrendingUp } from '@mui/icons-material';
+import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
+import NotificationsOffIcon from '@mui/icons-material/NotificationsOff';
 import { Alert, Box, Button, ButtonGroup, CardContent, Divider, Grid, Link, MenuItem, Skeleton, ToggleButton, Typography } from '@mui/material';
 import React, { Suspense, useCallback, useContext, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
@@ -28,10 +31,11 @@ import useDBMeta from '../../../../ReactHooks/useDBMeta';
 import useForceUpdate from '../../../../ReactHooks/useForceUpdate';
 import useMediaQueryUp from '../../../../ReactHooks/useMediaQueryUp';
 import useTeamData, { getTeamData } from '../../../../ReactHooks/useTeamData';
-import { CharacterKey, charKeyToLocCharKey, LocationCharacterKey } from '../../../../Types/consts';
-import { objPathValue, range } from '../../../../Util/Util';
-import { maxBuildsToShowList } from './Build';
+import { OptProblemInput } from '../../../../Solver';
 import { Build, mergeBuilds, mergePlot } from '../../../../Solver/common';
+import { GOSolver } from '../../../../Solver/GOSolver/GOSolver';
+import { objectKeyMap, objPathValue, range } from '../../../../Util/Util';
+import { maxBuildsToShowList } from './Build';
 import ArtifactSetConfig from './Components/ArtifactSetConfig';
 import AssumeFullLevelToggle from './Components/AssumeFullLevelToggle';
 import BonusStatsCard from './Components/BonusStatsCard';
@@ -47,10 +51,6 @@ import WorkerErr from './Components/WorkerErr';
 import { compactArtifacts, dynamicData } from './foreground';
 import useBuildResult from './useBuildResult';
 import useBuildSetting from './useBuildSetting';
-import NotificationsOffIcon from '@mui/icons-material/NotificationsOff';
-import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
-import { OptProblemInput, SolverBase } from '../../../../Solver/SolverBase';
-import { GOSolver } from '../../../../Solver/GOSolver/GOSolver';
 
 const audio = new Audio("notification.mp3")
 export default function TabBuild() {
@@ -71,10 +71,10 @@ export default function TabBuild() {
   const [artsDirty, setArtsDirty] = useForceUpdate()
 
   const [{ equipmentPriority, threads = defThreads }, setDisplayOptimize] = useState(database.displayOptimize.get())
-  useEffect(() => database.displayOptimize.follow((r, to) => setDisplayOptimize(to)), [database, setDisplayOptimize])
+  useEffect(() => database.displayOptimize.follow((_r, to) => setDisplayOptimize(to)), [database, setDisplayOptimize])
 
   const maxWorkers = threads > defThreads ? defThreads : threads
-  const setMaxWorkers = useCallback(threads => database.displayOptimize.set({ threads }), [database],)
+  const setMaxWorkers = useCallback((threads: number) => database.displayOptimize.set({ threads }), [database],)
 
   const characterDispatch = useCharacterReducer(characterKey)
   const onClickTeammate = useCharSelectionCallback()
@@ -101,7 +101,7 @@ export default function TabBuild() {
 
   const deferredArtsDirty = useDeferredValue(artsDirty)
   const deferredBuildSetting = useDeferredValue(buildSetting)
-  const filteredArts = useMemo(() => {
+  const { filteredArts, numExcludedUsed, numEquippedUsed } = useMemo(() => {
     const { mainStatKeys, useExcludedArts, useEquippedArts, levelLow, levelHigh } = deferredArtsDirty && deferredBuildSetting
     const cantTakeList: Set<LocationCharacterKey> = new Set()
     if (useEquippedArts) {
@@ -109,34 +109,44 @@ export default function TabBuild() {
       if (index < 0) equipmentPriority.forEach(ek => cantTakeList.add(charKeyToLocCharKey(ek)))
       else equipmentPriority.slice(0, index).forEach(ek => cantTakeList.add(charKeyToLocCharKey(ek)))
     }
-    return database.arts.values.filter(art => {
+    let numExcludedUsed = 0, numEquippedUsed = 0
+    const filteredArts = database.arts.values.filter(art => {
       if (art.level < levelLow) return false
       if (art.level > levelHigh) return false
       const mainStats = mainStatKeys[art.slotKey]
       if (mainStats?.length && !mainStats.includes(art.mainStatKey)) return false
 
-      if (art.exclude && !useExcludedArts) return false
-
       // If its equipped on the selected character, bypass the check
-      if (art.location === charKeyToLocCharKey(characterKey)) return true
-      if (art.location && !useEquippedArts) return false
-      if (art.location && useEquippedArts && cantTakeList.has(art.location)) return false
+      const locKey = charKeyToLocCharKey(characterKey)
+      if (art.location !== locKey) {
+        if (art.location && !useEquippedArts) return false
+        if (art.location && useEquippedArts && cantTakeList.has(art.location)) return false
+      }
+
+      if (art.exclude) {
+        numExcludedUsed++
+        if (!useExcludedArts) return false
+      }
+
+      if (art.location && art.location !== locKey) numEquippedUsed++
       return true
     })
+
+    return { filteredArts, numExcludedUsed, numEquippedUsed }
   }, [database, characterKey, equipmentPriority, deferredArtsDirty, deferredBuildSetting])
 
-  const filteredArtIds = useMemo(() => filteredArts.map(a => a.id), [filteredArts])
+  const filteredArtIdMap = useMemo(() => objectKeyMap(filteredArts.map(({ id }) => id), _ => true), [filteredArts])
   const levelTotal = useMemo(() => {
     const { levelLow, levelHigh } = deferredBuildSetting
     let total = 0, current = 0
     Object.entries(database.arts.data).forEach(([id, art]) => {
       if (art.level >= levelLow && art.level <= levelHigh) {
         total++
-        if (filteredArtIds.includes(id)) current++
+        if (filteredArtIdMap[id]) current++
       }
     })
     return `${current}/${total}`
-  }, [deferredBuildSetting, filteredArtIds, database])
+  }, [deferredBuildSetting, filteredArtIdMap, database])
 
   const tabFocused = useRef(true)
   useEffect(() => {
@@ -198,42 +208,25 @@ export default function TabBuild() {
     const plotBaseNode = plotBaseNumNode ? nodes.pop() : undefined
     const optimizationTargetNode = nodes.pop()!
 
-    const baseProblem: OptProblemInput = {
+    const problem: OptProblemInput = {
       arts: split, optimizationTarget: optimizationTargetNode,
-      artSet: artSetExclusion, constraints: nodes.map((value, i) => ({ value, min: minimum[i] })),
+      exclusion: artSetExclusion, constraints: nodes.map((value, i) => ({ value, min: minimum[i] })),
 
-      topN: maxBuildsToShow, plotBase: plotBaseNode, numWorkers: maxWorkers
+      topN: maxBuildsToShow, plotBase: plotBaseNode
     }
-    const solver: SolverBase<unknown, { command: string }> = new GOSolver(baseProblem)
-    cancelled.then(() => solver.cancel())
-    solver.onWorkerError(e => {
-      console.log('Failed to load worker')
-      console.log(e)
-      setWorkerErr(true)
-      cancelToken.current()
-    })
-    solver.onSuccess(() => {
-      setTimeout(() => {
-        // Using a ref because a user can cancel the notification while the build is going.
-        if (results && notificationRef.current) {
-          audio.play()
-          if (!tabFocused.current) setTimeout(() => window.alert(t`buildCompleted`), 1)
-        }
-      }, 100)
-    })
-    const buildTimer = setInterval(() => setBuildStatus({ type: "active", ...solver.computeStatus }), 100)
+    const status: Omit<BuildStatus, 'type'> = { tested: 0, failed: 0, skipped: 0, total: 0, startTime: performance.now() }
+    const statusUpdateTimer = setInterval(() => setBuildStatus({ type: "active", ...status }), 100)
 
-    const results = await solver.solve()
+    const cancellationError = new Error()
+    try {
+      const solver = new GOSolver(problem, status, maxWorkers)
+      cancelled.then(() => solver.cancel(cancellationError))
 
-    clearInterval(buildTimer)
-    cancelToken.current = () => { }
+      const results = await solver.solve()
+      solver.cancel() // Done using `solver`
 
-    if (!results) {
-      solver.computeStatus.tested = 0
-      solver.computeStatus.failed = 0
-      solver.computeStatus.skipped = 0
-      solver.computeStatus.total = 0
-    } else {
+      cancelToken.current = () => { }
+
       if (plotBaseNumNode) {
         const plotData = mergePlot(results.map(x => x.plotData!))
         let data = Object.values(plotData)
@@ -249,14 +242,38 @@ export default function TabBuild() {
       }
       const builds = mergeBuilds(results.map(x => x.builds), maxBuildsToShow)
       if (process.env.NODE_ENV === "development") console.log("Build Result", builds)
+
       buildResultDispatch({ builds: builds.map(build => build.artifactIds), buildDate: Date.now() })
+
+      setTimeout(() => {
+        // Using a ref because a user can cancel the notification while the build is going.
+        if (results && notificationRef.current) {
+          audio.play()
+          if (!tabFocused.current) setTimeout(() => window.alert(t`buildCompleted`), 1)
+        }
+      }, 100)
+    } catch (e) {
+      // Worker error, cancelled, printer catches on fire, etc.
+      if (e !== cancellationError) {
+        console.log('Failed to load worker')
+        console.log(e)
+        setWorkerErr(true)
+      }
+
+      cancelToken.current()
+      status.tested = 0
+      status.failed = 0
+      status.skipped = 0
+      status.total = 0
+    } finally {
+      clearInterval(statusUpdateTimer)
+      setBuildStatus({ type: "inactive", ...status, finishTime: performance.now() })
     }
-    setBuildStatus({ ...solver.computeStatus, type: "inactive", finishTime: performance.now() })
   }, [t, characterKey, filteredArts, database, buildResultDispatch, maxWorkers, buildSetting, notificationRef, setChartData, gender])
 
   const characterName = characterSheet?.name ?? "Character Name"
 
-  const setPlotBase = useCallback(plotBase => {
+  const setPlotBase = useCallback((plotBase: string[] | undefined) => {
     buildSettingDispatch({ plotBase })
     setChartData(undefined)
   }, [buildSettingDispatch, setChartData])
@@ -270,8 +287,8 @@ export default function TabBuild() {
     disabled={!!generatingBuilds}
   />
 
-  const getLabel0 = useCallback((index) => <Trans t={t} i18nKey="graphBuildLabel" count={index + 1}>Graph #{{ count: index + 1 }}</Trans>, [t])
-  const getLabel1 = useCallback((index) => `#${index + 1}`, [])
+  const getGraphBuildLabel = useCallback((index: number) => <Trans t={t} i18nKey="graphBuildLabel" count={index + 1}>Graph #{{ count: index + 1 }}</Trans>, [t])
+  const getNormBuildLabel = useCallback((index: number) => `#${index + 1}`, [])
   return <Box display="flex" flexDirection="column" gap={1}>
     {noArtifact && <Alert severity="warning" variant="filled"><Trans t={t} i18nKey="noArtis">Oops! It looks like you haven't added any artifacts to GO yet! You should go to the <Link component={RouterLink} to="/artifacts">Artifacts</Link> page and add some!</Trans></Alert>}
     {/* Build Generator Editor */}
@@ -289,7 +306,7 @@ export default function TabBuild() {
           <CardLight>
             <CardContent  >
               <Box display="flex" alignItems="center" gap={1}>
-                <AssumeFullLevelToggle mainStatAssumptionLevel={mainStatAssumptionLevel} setmainStatAssumptionLevel={mainStatAssumptionLevel => buildSettingDispatch({ mainStatAssumptionLevel })} disabled={generatingBuilds} />
+                <AssumeFullLevelToggle mainStatAssumptionLevel={mainStatAssumptionLevel} setmainStatAssumptionLevel={(mainStatAssumptionLevel: number) => buildSettingDispatch({ mainStatAssumptionLevel })} disabled={generatingBuilds} />
                 <InfoTooltip title={<Box>
                   <Typography variant="h6">{t`mainStat.levelAssTooltip.title`}</Typography>
                   <Typography>{t`mainStat.levelAssTooltip.desc`}</Typography>
@@ -297,7 +314,7 @@ export default function TabBuild() {
               </Box>
             </CardContent>
             {/* main stat selector */}
-            <MainStatSelectionCard disabled={generatingBuilds} filteredArtIds={filteredArtIds} />
+            <MainStatSelectionCard disabled={generatingBuilds} filteredArtIdMap={filteredArtIdMap} />
           </CardLight>
           <BonusStatsCard />
         </Grid>
@@ -307,10 +324,10 @@ export default function TabBuild() {
           <ArtifactSetConfig disabled={generatingBuilds} />
 
           {/* use excluded */}
-          <UseExcluded disabled={generatingBuilds} artsDirty={artsDirty} />
+          <UseExcluded disabled={generatingBuilds} numExcludedArt={numExcludedUsed} />
 
           {/* use equipped */}
-          <UseEquipped disabled={generatingBuilds} filteredArts={filteredArts} />
+          <UseEquipped disabled={generatingBuilds} numArtsEquippedUsed={numEquippedUsed} />
 
           <Button
             fullWidth
@@ -419,8 +436,8 @@ export default function TabBuild() {
         </CardContent>
       </CardLight>
       <OptimizationTargetContext.Provider value={optimizationTarget}>
-        {graphBuilds && <BuildList builds={graphBuilds} characterKey={characterKey} data={data} compareData={compareData} disabled={!!generatingBuilds} getLabel={getLabel0} setBuilds={setGraphBuilds} />}
-        <BuildList builds={builds} characterKey={characterKey} data={data} compareData={compareData} disabled={!!generatingBuilds} getLabel={getLabel1} />
+        {graphBuilds && <BuildList builds={graphBuilds} characterKey={characterKey} data={data} compareData={compareData} disabled={!!generatingBuilds} getLabel={getGraphBuildLabel} setBuilds={setGraphBuilds} />}
+        <BuildList builds={builds} characterKey={characterKey} data={data} compareData={compareData} disabled={!!generatingBuilds} getLabel={getNormBuildLabel} />
       </OptimizationTargetContext.Provider>
     </DataContext.Provider>}
   </Box>
