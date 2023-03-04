@@ -1,0 +1,34 @@
+{
+  "title": "Pengaturan",
+  "languageCard": {
+    "selectLanguage": "Pilih Bahasa",
+    "languageFormat": "Bahasa: {{language}}"
+  },
+  "uploadCard": {
+    "title": "Unggah Database",
+    "replaceDatabase": "Ganti Database",
+    "hint": "Unggah file JSON di sini...",
+    "hintPaste": "...atau tempel datamu di bawah.",
+    "error": {
+      "jsonParse": "Tidak dapat mengurai file JSON.",
+      "unknown": "Format file tidak dikenal.",
+      "monaInvalid": "Format file Mona-Uranai tidak valid",
+      "goInvalid": "Format file cadangan GO tidak valid."
+    },
+    "dbSource": "Sumber data:",
+    "goodUpload": {
+      "title": "<strong>Genshin Open Object Description</strong> (GOOD) format"
+    }
+  },
+  "count": {
+    "chars": "Karakter:",
+    "arts": "Artefak:",
+    "weapons": "Senjata:",
+    "total": "Total:",
+    "new": "Baru:",
+    "updated": "Terupdate:",
+    "removed": "Dihilangkan:",
+    "unchanged": "Tidak berubah:",
+    "invalid": "Invalid:"
+  }
+}
