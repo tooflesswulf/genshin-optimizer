@@ -1,5 +1,5 @@
-import { BNBCommand } from "./BNBVecSolver";
+// import { BNBCommand } from "./BNBVecSolver";
 
-onmessage = async (e: MessageEvent<BNBCommand>) => {
-  postMessage({ resultType: 'done' })
-}
+// onmessage = async (e: MessageEvent<BNBCommand>) => {
+//   postMessage({ resultType: 'done' })
+// }

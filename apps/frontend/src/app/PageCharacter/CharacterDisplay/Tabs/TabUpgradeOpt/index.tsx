@@ -59,43 +59,33 @@ export default function TabUpopt() {
   const isSM = ["xs", "sm"].includes(useMediaQueryUp())
 
   const [artsDirty, setArtsDirty] = useForceUpdate()
-  const [{ equipmentPriority, threads = defThreads }, setDisplayOptimize] = useState(database.displayOptimize.get())
+  // const [{ equipmentPriority, threads = defThreads }, setDisplayOptimize] = useState(database.displayOptimize.get())
+  const [{ threads = defThreads }, setDisplayOptimize] = useState(database.displayOptimize.get())
   useEffect(() => database.displayOptimize.follow((_r, to) => setDisplayOptimize(to)), [database, setDisplayOptimize])
   const deferredArtsDirty = useDeferredValue(artsDirty)
   const deferredBuildSetting = useDeferredValue(buildSetting)
-  const { filteredArts, numExcludedUsed, numEquippedUsed } = useMemo(() => {
-    const { mainStatKeys, useExcludedArts, useEquippedArts, levelLow, levelHigh } = deferredArtsDirty && deferredBuildSetting
-    const cantTakeList: Set<LocationCharacterKey> = new Set()
-    if (useEquippedArts) {
-      const index = equipmentPriority.indexOf(characterKey)
-      if (index < 0) equipmentPriority.forEach(ek => cantTakeList.add(charKeyToLocCharKey(ek)))
-      else equipmentPriority.slice(0, index).forEach(ek => cantTakeList.add(charKeyToLocCharKey(ek)))
-    }
-    let numExcludedUsed = 0, numEquippedUsed = 0
+  const { filteredArts, numEquippedUsed } = useMemo(() => {
+    const { mainStatKeys, allowLocations, artExclusion, levelLow, levelHigh } = deferredArtsDirty && deferredBuildSetting
+
+    let numEquippedUsed = 0
     const filteredArts = database.arts.values.filter(art => {
+      if (artExclusion.includes(art.id)) return false
       if (art.level < levelLow) return false
       if (art.level > levelHigh) return false
       const mainStats = mainStatKeys[art.slotKey]
       if (mainStats?.length && !mainStats.includes(art.mainStatKey)) return false
 
-      // If its equipped on the selected character, bypass the check
       const locKey = charKeyToLocCharKey(characterKey)
-      if (art.location !== locKey) {
-        if (art.location && !useEquippedArts) return false
-        if (art.location && useEquippedArts && cantTakeList.has(art.location)) return false
+      if (art.location && art.location !== locKey) {
+        if (!allowLocations.includes(art.location)) return false
+        numEquippedUsed++
       }
 
-      if (art.exclude) {
-        numExcludedUsed++
-        if (!useExcludedArts) return false
-      }
-
-      if (art.location && art.location !== locKey) numEquippedUsed++
       return true
     })
 
-    return { filteredArts, numExcludedUsed, numEquippedUsed }
-  }, [database, characterKey, equipmentPriority, deferredArtsDirty, deferredBuildSetting])
+    return { filteredArts, numEquippedUsed }
+  }, [database, characterKey, deferredArtsDirty, deferredBuildSetting])
   const filteredArtIdMap = useMemo(() => objectKeyMap(filteredArts.map(({ id }) => id), _ => true), [filteredArts])
 
   const [artifactUpgradeOpts, setArtifactUpgradeOpts] = useState(undefined as UpgradeOptResult | undefined)
