@@ -6,8 +6,10 @@ import KeyMap, { cacheValueString } from "../KeyMap"
 import { allSubstatKeys, IArtifact, ISubstat, SubstatKey } from "../Types/artifact"
 import { getRandomElementFromArray, getRandomIntInclusive } from "./Util"
 
+// do not randomize Prayers since they don't have all slots
+const artSets = allArtifactSetKeys.filter(k => !k.startsWith("Prayers"))
 export function randomizeArtifact(base: Partial<IArtifact> = {}): IArtifact {
-  const setKey = base.setKey ?? getRandomElementFromArray(allArtifactSetKeys)
+  const setKey = base.setKey ?? getRandomElementFromArray(artSets)
   const sheet = getArtSheet(setKey)
   const rarity = base.rarity ?? getRandomElementFromArray(sheet.rarity)
   const slot = base.slotKey ?? getRandomElementFromArray(sheet.slots)
@@ -39,7 +41,5 @@ export function randomizeArtifact(base: Partial<IArtifact> = {}): IArtifact {
       substat.value = parseFloat(artifactSubstatRollCorrection[rarity]?.[substat.key]?.[value] ?? value)
     }
 
-  return {
-    setKey, rarity, slotKey: slot, mainStatKey, level, substats, location: base.location ?? "", lock: false, exclude: false,
-  }
+  return { setKey, rarity, slotKey: slot, mainStatKey, level, substats, location: base.location ?? "", lock: false, }
 }

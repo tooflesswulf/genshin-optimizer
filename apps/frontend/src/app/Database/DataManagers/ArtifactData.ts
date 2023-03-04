@@ -1,16 +1,15 @@
-import { allArtifactSetKeys, allArtifactSlotKeys, ArtifactSetKey, artMaxLevel } from "@genshin-optimizer/consts";
+import { allArtifactSetKeys, allArtifactSlotKeys, allLocationCharacterKeys, ArtifactSetKey, artMaxLevel, charKeyToLocCharKey } from "@genshin-optimizer/consts";
 import { getArtSheet } from "../../Data/Artifacts";
 import Artifact, { artifactSubRange } from "../../Data/Artifacts/Artifact";
 import KeyMap from "../../KeyMap";
 import { allMainStatKeys, allSubstatKeys, IArtifact, ICachedArtifact, ICachedSubstat, ISubstat, SubstatKey } from "../../Types/artifact";
-import { allArtifactRarities, ArtifactRarity, charKeyToLocCharKey, allLocationCharacterKeys } from "../../Types/consts";
+import { allArtifactRarities, ArtifactRarity } from "../../Types/consts";
+import { clamp } from "../../Util/Util";
 import { ArtCharDatabase } from "../Database";
 import { DataManager } from "../DataManager";
 import { IGO, IGOOD, ImportResult } from "../exim";
-import { clamp } from "../../Util/Util"
 
 export class ArtifactDataManager extends DataManager<string, "artifacts", ICachedArtifact, IArtifact>{
-  deletedArts = new Set<string>()
   constructor(database: ArtCharDatabase) {
     super(database, "artifacts")
     for (const key of this.database.storage.keys)
@@ -48,21 +47,20 @@ export class ArtifactDataManager extends DataManager<string, "artifacts", ICache
     return newArt
   }
   deCache(artifact: ICachedArtifact): IArtifact {
-    const { setKey, rarity, level, slotKey, mainStatKey, substats, location, exclude, lock } = artifact
-    return { setKey, rarity, level, slotKey, mainStatKey, substats: substats.map(substat => ({ key: substat.key, value: substat.value })), location, exclude, lock }
+    const { setKey, rarity, level, slotKey, mainStatKey, substats, location, lock } = artifact
+    return { setKey, rarity, level, slotKey, mainStatKey, substats: substats.map(substat => ({ key: substat.key, value: substat.value })), location, lock }
   }
 
   new(value: IArtifact): string {
-    const id = generateRandomArtID(new Set(this.keys), this.deletedArts)
+    const id = this.generateKey()
     this.set(id, value)
     return id
   }
-  remove(key: string) {
+  remove(key: string, notify = true) {
     const art = this.get(key)
     if (!art) return
     art.location && this.database.chars.setEquippedArtifact(art.location, art.slotKey, "")
-    this.deletedArts.add(key)
-    super.remove(key)
+    super.remove(key, notify)
   }
   setProbability(id: string, probability?: number) {
     const art = this.get(id)
@@ -70,7 +68,6 @@ export class ArtifactDataManager extends DataManager<string, "artifacts", ICache
   }
   clear(): void {
     super.clear()
-    this.deletedArts = new Set<string>()
   }
   importGOOD(good: IGOOD & IGO, result: ImportResult) {
     result.artifacts.beforeMerge = this.values.length
@@ -83,6 +80,13 @@ export class ArtifactDataManager extends DataManager<string, "artifacts", ICache
       return
     }
 
+    const takenIds = new Set(this.keys)
+    artifacts.forEach(a => {
+      const id = (a as ICachedArtifact).id
+      if (!id) return
+      takenIds.add(id)
+    })
+
     result.artifacts.import = artifacts.length
     const idsToRemove = new Set(this.values.map(a => a.id))
     const hasEquipment = artifacts.some(a => a.location)
@@ -91,35 +95,60 @@ export class ArtifactDataManager extends DataManager<string, "artifacts", ICache
       if (!art) return result.artifacts.invalid.push(a)
 
       let importArt = art
-      let importKey: string | undefined = (a as ICachedArtifact).id
+      let importId: string | undefined = (a as ICachedArtifact).id
+      let foundDupOrUpgrade = false
+      if (!result.ignoreDups) {
+        const { duplicated, upgraded } = this.findDups(art, Array.from(idsToRemove))
+        if (duplicated[0] || upgraded[0]) {
+          foundDupOrUpgrade = true
+          // Favor upgrades with the same location, else use 1st dupe
+          let [match, isUpgrade] = (hasEquipment && art.location && upgraded[0]?.location === art.location) ?
+            [upgraded[0], true] : (duplicated[0] ? [duplicated[0], false] : [upgraded[0], true])
+          if (importId) {
+            // favor exact id matches
+            const up = upgraded.find(a => a.id === importId)
+            if (up) [match, isUpgrade] = [up, true]
+            const dup = duplicated.find(a => a.id === importId)
+            if (dup) [match, isUpgrade] = [dup, false]
+          }
+          isUpgrade ? result.artifacts.upgraded.push(art) : result.artifacts.unchanged.push(art)
+          idsToRemove.delete(match.id)
 
-      let { duplicated, upgraded } = result.ignoreDups ? { duplicated: [], upgraded: [] } : this.findDups(art)
-      // Don't reuse dups/upgrades
-      duplicated = duplicated.filter(a => idsToRemove.has(a.id))
-      upgraded = upgraded.filter(a => idsToRemove.has(a.id))
-      if (duplicated[0] || upgraded[0]) {
-        // Favor upgrades with the same location, else use 1st dupe
-        const [match, isUpgrade] = (hasEquipment && art.location && upgraded[0]?.location === art.location) ?
-          [upgraded[0], true] : (duplicated[0] ? [duplicated[0], false] : [upgraded[0], true])
-        idsToRemove.delete(match.id)
-        isUpgrade ? result.artifacts.upgraded.push(art) : result.artifacts.unchanged.push(art)
-        importArt = { ...art, location: hasEquipment ? art.location : match.location }
-        importKey = importKey ?? match.id
+          //Imported artifact will be set to `importId` later, so remove the dup/upgrade now to avoid a duplicate
+          this.remove(match.id, false)// Do not notify, since this is a "replacement"
+          if (!importId) importId = match.id // always resolve some id
+          importArt = { ...art, location: hasEquipment ? art.location : match.location }
+        }
       }
-      if (importKey) this.set(importKey, importArt)
-      else this.new(importArt)
+      if (importId) {
+        if (this.get(importId)) { // `importid` already in use, get a new id
+          const newId = this.generateKey(takenIds)
+          takenIds.add(newId)
+          if (this.changeId(importId, newId)) {
+            // Sync the id in `idsToRemove` due to the `changeId`
+            if (idsToRemove.has(importId)) {
+              idsToRemove.delete(importId)
+              idsToRemove.add(newId)
+            }
+          }
+        }
+      } else {
+        importId = this.generateKey(takenIds)
+        takenIds.add(importId)
+      }
+      this.set(importId, importArt, !foundDupOrUpgrade)
     })
     const idtoRemoveArr = Array.from(idsToRemove)
     if (result.keepNotInImport || result.ignoreDups) result.artifacts.notInImport = idtoRemoveArr.length
     else idtoRemoveArr.forEach(k => this.remove(k))
 
-
     this.database.weapons.ensureEquipments()
   }
-  findDups(editorArt: IArtifact): { duplicated: ICachedArtifact[], upgraded: ICachedArtifact[] } {
+  findDups(editorArt: IArtifact, idList = this.keys): { duplicated: ICachedArtifact[], upgraded: ICachedArtifact[] } {
     const { setKey, rarity, level, slotKey, mainStatKey, substats } = editorArt
 
-    const candidates = this.values.filter(candidate =>
+    const arts = idList.map(id => this.get(id)).filter(a => a) as ICachedArtifact[]
+    const candidates = arts.filter(candidate =>
       setKey === candidate.setKey &&
       rarity === candidate.rarity &&
       slotKey === candidate.slotKey &&
@@ -158,25 +187,15 @@ export class ArtifactDataManager extends DataManager<string, "artifacts", ICache
   }
 }
 
-/// Get a random integer (converted to string) that is not in `keys`
-function generateRandomArtID(keys: Set<string>, rejectedKeys: Set<string>): string {
-  let ind = keys.size + rejectedKeys.size
-  let candidate = ""
-  do {
-    candidate = `artifact_${ind++}`
-  } while (keys.has(candidate) || rejectedKeys.has(candidate))
-  return candidate
-}
-
 export function cachedArtifact(flex: IArtifact, id: string): { artifact: ICachedArtifact, errors: string[] } {
-  const { location, exclude, lock, setKey, slotKey, rarity, mainStatKey } = flex
+  const { location, lock, setKey, slotKey, rarity, mainStatKey } = flex
   const level = Math.round(Math.min(Math.max(0, flex.level), rarity >= 3 ? rarity * 4 : 4))
   const mainStatVal = Artifact.mainStatValue(mainStatKey, rarity, level)!
 
   const errors: string[] = []
   const substats: ICachedSubstat[] = flex.substats.map(substat => ({ ...substat, rolls: [], efficiency: 0, accurateValue: substat.value }))
   // Carry over the probability, since its a cached value calculated outside of the artifact.
-  const validated: ICachedArtifact = { id, setKey, location, slotKey, exclude, lock, mainStatKey, rarity, level, substats, mainStatVal, probability: ((flex as any).probability) }
+  const validated: ICachedArtifact = { id, setKey, location, slotKey, lock, mainStatKey, rarity, level, substats, mainStatVal, probability: ((flex as any).probability) }
 
   const allPossibleRolls: { index: number, substatRolls: number[][] }[] = []
   let totalUnambiguousRolls = 0
@@ -262,7 +281,7 @@ export function cachedArtifact(flex: IArtifact, id: string): { artifact: ICached
 export function validateArtifact(obj: unknown = {}, allowZeroSub = false): IArtifact | undefined {
   if (!obj || typeof obj !== "object") return
   const { setKey, rarity, slotKey } = obj as IArtifact
-  let { level, mainStatKey, substats, location, exclude, lock, } = obj as IArtifact
+  let { level, mainStatKey, substats, location, lock, } = obj as IArtifact
 
   if (!allArtifactSetKeys.includes(setKey) ||
     !allArtifactSlotKeys.includes(slotKey) ||
@@ -280,13 +299,12 @@ export function validateArtifact(obj: unknown = {}, allowZeroSub = false): IArti
   // substat cannot have same key as mainstat
   if (substats.find(sub => sub.key === mainStatKey)) return
   lock = !!lock
-  exclude = !!exclude
   const plausibleMainStats = Artifact.slotMainStats(slotKey)
   if (!plausibleMainStats.includes(mainStatKey))
     if (plausibleMainStats.length === 1) mainStatKey = plausibleMainStats[0]
     else return // ambiguous mainstat
   if (!location || !allLocationCharacterKeys.includes(location)) location = ""
-  return { setKey, rarity, level, slotKey, mainStatKey, substats, location, exclude, lock }
+  return { setKey, rarity, level, slotKey, mainStatKey, substats, location, lock }
 }
 function defSub(): ISubstat {
   return { key: "", value: 0 }
