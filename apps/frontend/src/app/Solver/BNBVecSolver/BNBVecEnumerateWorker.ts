@@ -1,9 +1,9 @@
 import type { Interim } from '..'
 import type { BNBRequestFilter, SetupBNB } from './BNBVecSolver'
 import { ArtifactBuildData, ArtifactsBySlot, Build, DynStat, PlotData, mergePlot } from '../utils/common'
-import { ArtSetExclusionFull, ArtifactsBySlotVec, filterArtsVec } from '../utils/commonVec'
+import { ArtSetExclusionFull, ArtifactsBySlotVec } from '../utils/commonVec'
 import { OptNode, optimize, precompute } from '../../Formula/optimization'
-import { countFilterSize, filterArtsBNB, filterMinMax } from './bnbRequestFilter'
+import { filterArtsBNB, filterMinMax } from './bnbRequestFilter'
 import { simplifyFormula } from '../utils/boundedFormulaUtils'
 
 /* Returns true if `setKeyCounts` respects `excl` */
@@ -54,10 +54,11 @@ export class BNBVecEnumerateWorker {
   }
 
   setThreshold(newThreshold: number) {
-    if (this.threshold > newThreshold) this.threshold = newThreshold
+    this.threshold = Math.max(this.threshold, newThreshold)
   }
   enumerate(filters: BNBRequestFilter[]) {
-    const { min, objIx, plotIx } = this, self = this // `this` in nested functions means different things
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const { min, objIx, plotIx, exclusion } = this, self = this // `this` in nested functions means different things
     const preArts = this.arts
     const oldMaxBuildCount = this.builds.length
 
@@ -80,7 +81,7 @@ export class BNBVecEnumerateWorker {
     function permute(i: number, j: number, setKeyCounts: DynStat) {
       if (j < 0) {
         const result = compute(buffer)
-        if (min.some((m, i) => m > result[i]) || !checkArtSetExclusion(setKeyCounts, self.exclusion)) {
+        if (min.some((m, i) => m > result[i]) || !checkArtSetExclusion(setKeyCounts, exclusion)) {
           count.failed++
           return
         }
@@ -92,8 +93,8 @@ export class BNBVecEnumerateWorker {
           builds.push(build)
         }
         if (plotIx !== undefined && plotData) {
-          const x = result[plotIx]
-          if (!plotData[x] || plotData[x]!.value < value) {
+          const x = result[plotIx], pdx = plotData[x]
+          if (!pdx || pdx.value < value) {
             if (!build) build = { value, artifactIds: buffer.map(x => x.id).filter(id => id) }
             build.plot = x
             plotData[x] = build
@@ -126,8 +127,8 @@ export class BNBVecEnumerateWorker {
 
   refresh(force: boolean): void {
     const { topN } = this
-    if (Object.keys(this.plotData ?? {}).length >= 100000)
-      this.plotData = mergePlot([this.plotData!])
+    if (this.plotData && Object.keys(this.plotData).length >= 100000)
+      this.plotData = mergePlot([this.plotData])
 
     if (this.builds.length >= 1000 || force) {
       this.builds = this.builds
