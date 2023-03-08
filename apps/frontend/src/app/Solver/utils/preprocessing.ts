@@ -3,7 +3,7 @@ import { ArtSetExclusion } from "../../Database/DataManagers/BuildSettingData"
 import { forEachNodes, mapFormulas } from "../../Formula/internal"
 import { OptNode } from "../../Formula/optimization"
 import { constant, customRead, prod, sum, threshold } from "../../Formula/utils"
-import { ArtifactBuildData, ArtifactsBySlot, DynStat } from "../common"
+import { ArtifactsBySlot, DynStat, computeFullArtRange } from "./common"
 import { foldProd, foldSum, simplifyFormula } from "./boundedFormulaUtils"
 
 /** Delete/shift unsatisfiable thresholds() nodes due to artifact exclusion rules */
@@ -36,84 +36,42 @@ export function thresholdExclusions(nodes: OptNode[], excl: ArtSetExclusion) {
 export function thresholdToConstBranchForm(nodes: OptNode[]) {
   return mapFormulas(nodes, n => n, n => {
     switch (n.operation) {
-      case "threshold":
-        {
-          const [branch, bval, ge, lt] = n.operands
-          if (branch.operation === 'const' && bval.operation === 'const') {
-            return branch.value >= bval.value ? ge : lt
-          }
-          if (branch.operation === 'threshold' && bval.operation === 'const') {
-            // Reserved for non-stacking buffs
-            const [br2, bv2, ge2, lt2] = branch.operands
-            if (br2.operation === 'read' && bv2.operation === 'const' && ge2.operation === 'const' && lt2.operation === 'const') {
-              const left = ge2.value >= bval.value ? ge : lt
-              const right = lt2.value >= bval.value ? ge : lt
+      case "threshold": {
+        const [branch, bval, ge, lt] = n.operands
+        if (branch.operation === 'const' && bval.operation === 'const')
+          return branch.value >= bval.value ? ge : lt
+        if (branch.operation === 'threshold' && bval.operation === 'const') {
+          // Reserved for non-stacking buffs
+          const [br2, bv2, ge2, lt2] = branch.operands
+          if (br2.operation === 'read' && bv2.operation === 'const' && ge2.operation === 'const' && lt2.operation === 'const') {
+            const left = ge2.value >= bval.value ? ge : lt
+            const right = lt2.value >= bval.value ? ge : lt
 
-              console.log('non-stacking buff', n, threshold(br2, bv2, left, right))
-              return threshold(br2, bv2, left, right)
-            }
-            console.log('faulty node:', n)
-            throw Error('Not Implemented: nested threshold must follow the form [read, const, const, const]')
+            console.log('non-stacking buff', n, threshold(br2, bv2, left, right))
+            return threshold(br2, bv2, left, right)
           }
-          if (ge.operation !== 'const' || lt.operation !== 'const') {
-            if (lt.operation === 'const' && lt.value === 0) {
-              return prod(threshold(branch, bval, 1, 0), ge)
-            }
-            console.log('faulty node:', n)
-            throw Error('Not Implemented: threshold() node with non-constant `pass` AND non-zero `fail`')
-          }
-
-          if (branch.operation !== 'read') {
-            console.log('faulty node:', n)
-            throw Error('Not Implemented: threshold() node with non-read `branch`')
-          }
-          return n
+          console.log('faulty node:', n)
+          throw Error('Not Implemented: nested threshold must follow the form [read, const, const, const]')
         }
+        if (ge.operation !== 'const' || lt.operation !== 'const') {
+          if (lt.operation === 'const' && lt.value === 0)
+            return prod(threshold(branch, bval, 1, 0), ge)
+          console.log('faulty node:', n)
+          throw Error('Not Implemented: threshold() node with non-constant `pass` AND non-zero `fail`')
+        }
+        if (branch.operation !== 'read') {
+          console.log('faulty node:', n)
+          throw Error('Not Implemented: threshold() node with non-read `branch`')
+        }
+        return n
+      }
       default:
         return n
     }
   })
 }
 
-function slotUpperLower(a: ArtifactBuildData[]) {
-  if (a.length === 0) return { statsMin: {}, statsMax: {} }
-  // Assume keys are the same for all artifacts.
-  const keys = Object.keys(a[0].values)
-  const statsMin: DynStat = {}
-  const statsMax: DynStat = {}
-  const sets = new Set<ArtifactSetKey>()
-  keys.forEach(k => { statsMin[k] = Infinity; statsMax[k] = -Infinity })
-  for (let i = 0; i < a.length; i++) {
-    for (let j = 0; j < keys.length; j++) {
-      const k = keys[j]
-      statsMin[k] = Math.min(a[i].values[k], statsMin[k])
-      statsMax[k] = Math.max(a[i].values[k], statsMax[k])
-    }
-    const aiset = a[i].set
-    if (aiset) sets.add(aiset)
-  }
-  sets.forEach(set => { statsMax[set] = 1; statsMin[set] = 0 })
-  if (sets.size === 1) {
-    const [s] = sets
-    statsMin[s] = 1
-  }
-  return { statsMin, statsMax }
-}
-
-function statsUpperLower(a: ArtifactsBySlot) {
-  const statsMin: DynStat = { ...a.base }
-  const statsMax: DynStat = { ...a.base }
-  Object.entries(a.values).forEach(([slotKey, slotArts]) => {
-    const { statsMin: statsMinSlot, statsMax: statsMaxSlot } = slotUpperLower(slotArts)
-    Object.keys(statsMinSlot).forEach(sk => {
-      statsMin[sk] = statsMinSlot[sk] + (statsMin[sk] ?? 0)
-      statsMax[sk] = statsMaxSlot[sk] + (statsMax[sk] ?? 0)
-    })
-  })
-  return { statsMin, statsMax }
-}
-
-export function makeid(length: number, disallowed?: string[]) {
+function makeid(length: number, disallowed?: string[]) {
   const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   const charactersLength = characters.length;
   for (let _ = 0; _ < 5; _++) {
@@ -126,10 +84,10 @@ export function makeid(length: number, disallowed?: string[]) {
   throw Error('Too many collisions in `makeid`')
 }
 
-function isShallow(f: OptNode) {
-  if (f.operation === 'const' || f.operation === 'read' || f.operation === 'threshold') return true
-  if (f.operation !== 'add') return false
-  return f.operands.every(n => n.operation === 'const' || n.operation === 'read' || n.operation === 'threshold')
+function isShallow({ operation, operands }: OptNode) {
+  if (operation === 'const' || operation === 'read' || operation === 'threshold') return true
+  if (operation !== 'add') return false
+  return operands.every(n => n.operation === 'const' || n.operation === 'read' || n.operation === 'threshold')
 }
 
 function deleteKey(a: ArtifactsBySlot, key: string) {
@@ -144,7 +102,7 @@ function deleteKey(a: ArtifactsBySlot, key: string) {
 /**
  * Folds the formula along addable parameters. For example:
  *            `atk + 790 * atk_ + 667` <=> `kf3Dk`
- *   where
+ *   where `kf3Dk` is a new statKey
  * @param arts     ArtifactsBySlot, modified in-place
  * @param nodes Objective function and/or constraints
  */
@@ -254,10 +212,11 @@ function collapseAffine(arts: ArtifactsBySlot, nodes: OptNode[]) {
   return { arts, nodes: newNodes }
 }
 
+/** Reduce number of total stats by combining linearly dependent quantities. */
 export function elimLinDepStats(arts: ArtifactsBySlot, nodes: OptNode[]) {
   // Step 1. Find all constants and eliminate them from the equation.
-  const { statsMin, statsMax } = statsUpperLower(arts)
-  nodes = simplifyFormula(nodes, statsMin, statsMax);
+  const minMax = computeFullArtRange(arts)
+  nodes = simplifyFormula(nodes, minMax);
 
   // Step 2. Find all sums of variables and constants, and combine these values into named registers
   ({ arts, nodes } = collapseAffine(arts, nodes))

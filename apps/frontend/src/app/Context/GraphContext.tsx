@@ -1,6 +1,6 @@
 import { createContext } from "react"
 import { NumNode } from "../Formula/type"
-import { Build } from "../Solver/common"
+import { Build } from "../Solver/utils/common"
 
 export type ChartData = {
   valueNode: NumNode,

@@ -35,7 +35,7 @@ import MainStatSelectionCard from '../TabOptimize/Components/MainStatSelectionCa
 import { CharacterContext } from '../../../../Context/CharacterContext';
 import ArtifactLevelSlider from '../../../../Components/Artifact/ArtifactLevelSlider';
 import { ICachedArtifact } from '../../../../Types/artifact';
-import { DynStat } from "../../../../Solver/common";
+import { DynStat } from "../../../../Solver/utils/common";
 import useMediaQueryUp from '../../../../ReactHooks/useMediaQueryUp';
 import { LocationCharacterKey, charKeyToLocCharKey } from '@genshin-optimizer/consts';
 import useForceUpdate from '../../../../ReactHooks/useForceUpdate';

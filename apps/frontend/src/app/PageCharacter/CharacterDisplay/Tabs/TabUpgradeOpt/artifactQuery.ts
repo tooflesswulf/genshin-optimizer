@@ -1,6 +1,6 @@
 import { SubstatKey, allSubstatKeys, ICachedArtifact } from "../../../../Types/artifact"
 import Artifact from "../../../../Data/Artifacts/Artifact"
-import { DynStat } from "../../../../Solver/common"
+import { DynStat } from "../../../../Solver/utils/common"
 import { Data } from "../../../../Formula/type"
 import { Query, QueryBuild, QueryResult } from "./artifactQueryTypes"
 import { precompute, optimize, OptNode } from "../../../../Formula/optimization"

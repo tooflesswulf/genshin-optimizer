@@ -2,9 +2,9 @@ import { Interim, Setup } from "..";
 import { OptNode } from "../../Formula/optimization";
 import { ArtifactSlotKey } from "@genshin-optimizer/consts";
 import { objectKeyValueMap, objectMap } from "../../Util/Util";
-import { ArtifactBuildData, ArtifactsBySlot, countBuilds, DynStat, filterArts, pruneAll, RequestFilter } from "../common";
+import { ArtifactBuildData, ArtifactsBySlot, countBuilds, DynStat, filterArts, pruneAll, RequestFilter } from "../utils/common";
 import type { SplitWorker } from "./BackgroundWorker";
-import { linearUB } from "./linearUB";
+import { linearUB } from "../utils/linearUB";
 
 type Approximation = {
   base: number,

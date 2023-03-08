@@ -1,6 +1,6 @@
 import { WorkerCommand, WorkerResult } from '..'
 import { assertUnreachable } from '../../Util/Util'
-import { artSetPerm, countBuilds, filterArts, filterFeasiblePerm, RequestFilter } from "../common"
+import { artSetPerm, countBuilds, filterArts, filterFeasiblePerm, RequestFilter } from "../utils/common"
 import { BNBSplitWorker } from "./BNBSplitWorker"
 import { ComputeWorker } from "./ComputeWorker"
 import { DefaultSplitWorker } from './DefaultSplitWorker'

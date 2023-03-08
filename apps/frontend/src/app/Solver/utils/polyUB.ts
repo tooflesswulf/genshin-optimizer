@@ -4,7 +4,9 @@ import { OptNode, allOperations } from "../../Formula/optimization";
 import { ConstantNode } from "../../Formula/type";
 import { prod, threshold } from "../../Formula/utils";
 import { assertUnreachable, cartesian } from "../../Util/Util";
-import { ArtifactsBySlot, MinMax, computeFullArtRange, computeNodeRange } from "../common";
+import { ArtifactsBySlotVec, statsUpperLowerVec } from "./commonVec";
+import { ExpandedFormulas } from "./expandFormula";
+import { ArtifactsBySlot, DynMinMax, MinMax, computeFullArtRange, computeNodeRange } from "./common";
 import { Linear } from "./linearUB";
 
 /**
@@ -22,7 +24,7 @@ type PolySum = { type: 'sum', terms: PolynomialWithBounds[], $c: number, min: nu
 
 function constP(n: number): LinTerm { return { type: 'lin', lin: { $c: n }, min: n, max: n } }
 function readP(k: string, minmax: MinMax): LinTerm { return { type: 'lin', lin: { [k]: 1, $c: 0 }, ...minmax } }
-function sumP(...terms:  (PolynomialWithBounds | number)[]): PolySum {
+function sumP(...terms: (PolynomialWithBounds | number)[]): PolySum {
   const c = (terms.filter(v => (typeof v) === 'number') as number[]).reduce((a, b) => a + b, 0)
   const poly = terms.filter(v => (typeof v) !== 'number') as PolynomialWithBounds[]
   return {
@@ -50,6 +52,25 @@ function interpolate(x0: number, y0: number, x1: number, y1: number, poly: Polyn
 }
 
 export function polyUB(nodes: OptNode[], arts: ArtifactsBySlot): SumOfMonomials[] {
+  const statMinMax = computeFullArtRange(arts)
+  return _polyUB(nodes, statMinMax)
+}
+export function polyUBExpandedVec({ formulas, atoms }: ExpandedFormulas, artsVec: ArtifactsBySlotVec): SumOfMonomials[] {
+  const minmax = statsUpperLowerVec(artsVec)
+  const statMinMax = {} as DynMinMax
+  artsVec.keys.forEach((k, i) => statMinMax[k] = { min: minmax.lower[i], max: minmax.upper[i] })
+  const polyAtoms = _polyUB(atoms, statMinMax)
+
+  const polyUBs = formulas.map(factors => {
+    const factorPoly = sumM(...factors.map(({ $k, terms }) =>
+      prodM([constM($k)], ...terms.map(i => polyAtoms[i]))
+    ))
+    return foldLikeTerms(factorPoly)
+  })
+  return polyUBs
+}
+
+function _polyUB(nodes: OptNode[], statMinMax: DynMinMax): SumOfMonomials[] {
   const minMaxes = new Map<OptNode, MinMax>()
   forEachNodes(nodes, f => {
     const { operation } = f
@@ -59,7 +80,6 @@ export function polyUB(nodes: OptNode[], arts: ArtifactsBySlot): SumOfMonomials[
         f.operands.forEach(op => minMaxes.set(op, { min: NaN, max: NaN }))
     }
   }, _ => _)
-  const statMinMax = computeFullArtRange(arts)
   const nodeRanges = computeNodeRange([...minMaxes.keys()], statMinMax)
   for (const [node, minMax] of nodeRanges.entries()) minMaxes.set(node, minMax)
 
@@ -97,7 +117,7 @@ export function polyUB(nodes: OptNode[], arts: ArtifactsBySlot): SumOfMonomials[
             (ctx === upper && min < 0 && p.max > -max))
             throw new PolyError("Unallowed large crossing post approximation", operation)
 
-            return p
+          return p
         })
         return prodP(k, ...polys)
       }
@@ -181,15 +201,15 @@ type Monomial = {
 }
 function constM(v: number): Monomial { return { $k: v, terms: [] } }
 function weightedReadM(key: string, v: number): Monomial { return { $k: v, terms: [key] } }
-function sumM(...monomials: Monomial[][]): Monomial[] { return monomials.flat() }
-function prodM(...monomials: Monomial[][]): Monomial[] {
+function sumM(...monomials: SumOfMonomials[]): SumOfMonomials { return monomials.flat() }
+function prodM(...monomials: SumOfMonomials[]): SumOfMonomials {
   return cartesian(...monomials).map(monos => monos.reduce((ret, nxt) => {
     ret.$k *= nxt.$k
     ret.terms.push(...nxt.terms)
     return ret
   }, { $k: 1, terms: [] }))
 }
-function foldLikeTerms(mon: Monomial[]): Monomial[] {
+function foldLikeTerms(mon: SumOfMonomials): SumOfMonomials {
   mon.forEach(m => m.terms.sort())
   mon.sort(({ terms: termsA }, { terms: termsB }) => {
     if (termsA.length !== termsB.length) return termsA.length - termsB.length
@@ -213,7 +233,7 @@ function foldLikeTerms(mon: Monomial[]): Monomial[] {
   return mon
 }
 function expandPoly(node: PolynomialWithBounds): SumOfMonomials {
-  function toExpandedPoly(n: PolynomialWithBounds): Monomial[] {
+  function toExpandedPoly(n: PolynomialWithBounds): SumOfMonomials {
     switch (n.type) {
       case 'lin':
         return Object.entries(n.lin).filter(([k, v]) => v !== 0).map(([k, v]) => {

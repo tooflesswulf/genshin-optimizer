@@ -1,10 +1,13 @@
 import { OptNode } from "../../Formula/optimization";
 import { assertUnreachable, cartesian } from "../../Util/Util";
-import { ArtifactsBySlot, DynStat, MinMax, computeFullArtRange } from "../common";
-import { polyUB } from "./polyUB";
+import { ArtifactsBySlotVec, statsUpperLowerVec } from "./commonVec";
+import { ExpandedFormulas } from "./expandFormula";
+import { ArtifactsBySlot, DynMinMax, DynStat, MinMax, computeFullArtRange } from "./common";
+import { SumOfMonomials, polyUB, polyUBExpandedVec } from "./polyUB";
 import { solveLP } from "./solveLP";
 
 export type Linear = DynStat & { $c: number }
+export type LinearVec = { $c: number, weights: number[] }
 
 function weightedSum(...entries: readonly (readonly [number, Linear])[]): Linear {
   const result = { $c: 0 }
@@ -17,7 +20,19 @@ function weightedSum(...entries: readonly (readonly [number, Linear])[]): Linear
 export function linearUB(nodes: OptNode[], arts: ArtifactsBySlot): Linear[] {
   const polys = polyUB(nodes, arts)
   const minMax = computeFullArtRange(arts)
+  return _linearUB(polys, minMax)
+}
+export function linearUBExpandedVec(formulas: ExpandedFormulas, artsVec: ArtifactsBySlotVec): LinearVec[] {
+  const polys = polyUBExpandedVec(formulas, artsVec)
+  const upperLower = statsUpperLowerVec(artsVec)
+  const minMax = {} as DynMinMax
+  artsVec.keys.forEach((k, i) => minMax[k] = { min: upperLower.lower[i], max: upperLower.upper[i] })
+  const lins = _linearUB(polys, minMax)
 
+  return lins.map(lin => ({ $c: lin.$c, weights: artsVec.keys.map(k => lin[k] ?? 0) }))
+}
+
+function _linearUB(polys: SumOfMonomials[], minMax: DynMinMax): Linear[] {
   return polys.map(poly =>
     weightedSum(...poly.map(mon => {
       const bounds = mon.terms.map(key => minMax[key])

@@ -1,7 +1,7 @@
 import { ArtifactSlotKey, RarityKey } from "@genshin-optimizer/consts"
 import { SubstatKey } from "@genshin-optimizer/pipeline"
 import { NumNode } from "../../../../Formula/type"
-import { DynStat } from "../../../../Solver/common"
+import { DynStat } from "../../../../Solver/utils/common"
 
 export type GaussianMixture = {
   gmm: {

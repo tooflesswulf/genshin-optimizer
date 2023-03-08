@@ -1,6 +1,6 @@
 import { Count, FinalizeResult, Interim, OptProblemInput, Setup, WorkerCommand, WorkerResult } from ".."
 import { optimize } from "../../Formula/optimization"
-import { pruneAll, pruneExclusion } from "../common"
+import { pruneAll, pruneExclusion } from "../utils/common"
 import { WorkerCoordinator } from "../coordinator"
 
 export class GOSolver extends WorkerCoordinator<WorkerCommand, WorkerResult> {

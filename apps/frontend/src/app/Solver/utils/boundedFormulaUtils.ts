@@ -1,7 +1,7 @@
 import { mapFormulas } from "../../Formula/internal"
 import { OptNode, allOperations } from "../../Formula/optimization"
 import { constant, prod, sum } from "../../Formula/utils"
-import { DynStat } from "../common"
+import { DynMinMax } from "./common"
 
 export function foldSum(nodes: readonly OptNode[]): OptNode {
   if (nodes.length === 1) return nodes[0]
@@ -29,8 +29,9 @@ export function foldProd(nodes: readonly OptNode[]): OptNode {
 }
 
 /** Simplifies formula by substituting fixed stats */
-export function simplifyFormula(f: OptNode[], lower: DynStat, upper: DynStat): OptNode[] {
-  const fixedStats = Object.keys(lower).filter(statKey => lower[statKey] === upper[statKey])
+export function simplifyFormula(f: OptNode[], minMax: DynMinMax): OptNode[] {
+  const fixedStats = Object.entries(minMax).filter(([, { min, max }]) => min === max).map(([key]) => key)
+
   const f2 = mapFormulas(f, n => n, n => {
     switch (n.operation) {
       case 'add':
@@ -39,15 +40,15 @@ export function simplifyFormula(f: OptNode[], lower: DynStat, upper: DynStat): O
         return foldProd(n.operands)
 
       case 'read':
-        if (fixedStats.includes(n.path[1])) return constant(lower[n.path[1]])
+        if (fixedStats.includes(n.path[1])) return constant(minMax[n.path[1]].min)
         return n
       case 'threshold': {
         const [branch, branchVal, ge, lt] = n.operands
         if (branch.operation === 'const' && branchVal.operation === 'const')
           return branch.value >= branchVal.value ? ge : lt
         if (branch.operation === 'read' && branchVal.operation === 'const') {
-          if (lower[branch.path[1]] >= branchVal.value) return ge
-          if (upper[branch.path[1]] < branchVal.value) return lt
+          if (minMax[branch.path[1]].min >= branchVal.value) return ge
+          if (minMax[branch.path[1]].max < branchVal.value) return lt
         }
         return n
       }

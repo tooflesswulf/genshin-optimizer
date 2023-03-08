@@ -1,6 +1,9 @@
 import { ArtifactSetKey, allArtifactSetKeys, ArtifactSlotKey, allArtifactSlotKeys } from "@genshin-optimizer/consts"
-import { ArtifactsBySlot, RequestFilter } from "../common"
+import { ArtifactsBySlot, RequestFilter } from "./common"
 import { objectKeyMap } from "../../Util/Util"
+import { LinearVec } from "./linearUB"
+
+// Utility functions for dealing with ArtifactsBySlotVec
 
 /** Converts ArtifactsBySlot to ArtifactsBySlotVec */
 export function toArtifactsBySlotVec(arts: ArtifactsBySlot): ArtifactsBySlotVec {
@@ -16,14 +19,14 @@ export function toArtifactsBySlotVec(arts: ArtifactsBySlot): ArtifactsBySlotVec 
   const keys = [...allKeysList.filter(k => !(allArtifactSetKeys as readonly string[]).includes(k)), ...allKeysList.filter(k => (allArtifactSetKeys as readonly string[]).includes(k))]
 
   return {
-    keys, baseWBuffer: [],
+    keys, baseLinBuf: [],
     base: keys.map(k => arts.base[k] ?? 0),
     values: {
-      flower: arts.values.flower.map(({ id, set, values }) => ({ id, set, values: keys.map(k => values[k] ?? (k === set ? 1 : 0)), wBuffer: [] })),
-      plume: arts.values.plume.map(({ id, set, values }) => ({ id, set, values: keys.map(k => values[k] ?? (k === set ? 1 : 0)), wBuffer: [] })),
-      sands: arts.values.sands.map(({ id, set, values }) => ({ id, set, values: keys.map(k => values[k] ?? (k === set ? 1 : 0)), wBuffer: [] })),
-      goblet: arts.values.goblet.map(({ id, set, values }) => ({ id, set, values: keys.map(k => values[k] ?? (k === set ? 1 : 0)), wBuffer: [] })),
-      circlet: arts.values.circlet.map(({ id, set, values }) => ({ id, set, values: keys.map(k => values[k] ?? (k === set ? 1 : 0)), wBuffer: [] })),
+      flower: arts.values.flower.map(({ id, set, values }) => ({ id, set, values: keys.map(k => values[k] ?? (k === set ? 1 : 0)), linBuf: [] })),
+      plume: arts.values.plume.map(({ id, set, values }) => ({ id, set, values: keys.map(k => values[k] ?? (k === set ? 1 : 0)), linBuf: [] })),
+      sands: arts.values.sands.map(({ id, set, values }) => ({ id, set, values: keys.map(k => values[k] ?? (k === set ? 1 : 0)), linBuf: [] })),
+      goblet: arts.values.goblet.map(({ id, set, values }) => ({ id, set, values: keys.map(k => values[k] ?? (k === set ? 1 : 0)), linBuf: [] })),
+      circlet: arts.values.circlet.map(({ id, set, values }) => ({ id, set, values: keys.map(k => values[k] ?? (k === set ? 1 : 0)), linBuf: [] })),
     }
   }
 }
@@ -31,7 +34,7 @@ export function toArtifactsBySlotVec(arts: ArtifactsBySlot): ArtifactsBySlotVec 
 /** Selects a subset according to filter */
 export function filterArtsVec(arts: ArtifactsBySlotVec, filters: RequestFilter): ArtifactsBySlotVec {
   return {
-    keys: arts.keys, base: arts.base, baseWBuffer: arts.baseWBuffer,
+    keys: arts.keys, base: arts.base, baseLinBuf: arts.baseLinBuf,
     values: objectKeyMap(allArtifactSlotKeys, slot => {
       const filter = filters[slot]
       switch (filter.kind) {
@@ -46,7 +49,7 @@ export function filterArtsVec(arts: ArtifactsBySlotVec, filters: RequestFilter):
 /** Selects a subset according to filterVec */
 export function filterArtsIx(arts: ArtifactsBySlotVec, filterVec: StrictDict<ArtifactSlotKey, number[]>): ArtifactsBySlotVec {
   return {
-    keys: arts.keys, base: arts.base, baseWBuffer: [],
+    keys: arts.keys, base: arts.base, baseLinBuf: [],
     values: objectKeyMap(allArtifactSlotKeys, slot => {
       const filterIxs = filterVec[slot]
       const slotVals = arts.values[slot]
@@ -58,16 +61,16 @@ export function filterArtsIx(arts: ArtifactsBySlotVec, filterVec: StrictDict<Art
 export function slotUpperLowerVec(arts: ArtifactBuildDataVecDense[]) {
   const lower = [...arts[0].values]
   const upper = [...arts[0].values]
-  const minw = [...arts[0].wBuffer]
-  const maxw = [...arts[0].wBuffer]
+  const minw = [...arts[0].linBuf]
+  const maxw = [...arts[0].linBuf]
   for (let i = 1; i < arts.length; i++) {
     for (let j = 0; j < lower.length; j++) {
       lower[j] = Math.min(lower[j], arts[i].values[j])
       upper[j] = Math.max(upper[j], arts[i].values[j])
     }
     for (let j = 0; j < minw.length; j++) {
-      minw[j] = Math.min(minw[j], arts[i].wBuffer[j])
-      maxw[j] = Math.max(maxw[j], arts[i].wBuffer[j])
+      minw[j] = Math.min(minw[j], arts[i].linBuf[j])
+      maxw[j] = Math.max(maxw[j], arts[i].linBuf[j])
     }
   }
   return { lower, upper, minw, maxw }
@@ -75,8 +78,8 @@ export function slotUpperLowerVec(arts: ArtifactBuildDataVecDense[]) {
 export function statsUpperLowerVec(a: ArtifactsBySlotVec) {
   const lower = [...a.base]
   const upper = [...a.base]
-  const minw = [...a.baseWBuffer]
-  const maxw = [...a.baseWBuffer]
+  const minw = [...a.baseLinBuf]
+  const maxw = [...a.baseLinBuf]
   Object.values(a.values).forEach(slotArts => {
     const slotUL = slotUpperLowerVec(slotArts)
     for (let i = 0; i < lower.length; i++) {
@@ -91,19 +94,19 @@ export function statsUpperLowerVec(a: ArtifactsBySlotVec) {
   return { lower, upper, minw, maxw }
 }
 export function bufferSlotUpperLower(arts: ArtifactBuildDataVecDense[]) {
-  const minw = [...arts[0].wBuffer]
-  const maxw = [...arts[0].wBuffer]
+  const minw = [...arts[0].linBuf]
+  const maxw = [...arts[0].linBuf]
   for (let i = 1; i < arts.length; i++) {
     for (let j = 0; j < minw.length; j++) {
-      minw[j] = Math.min(minw[j], arts[i].wBuffer[j])
-      maxw[j] = Math.max(maxw[j], arts[i].wBuffer[j])
+      minw[j] = Math.min(minw[j], arts[i].linBuf[j])
+      maxw[j] = Math.max(maxw[j], arts[i].linBuf[j])
     }
   }
   return { minw, maxw }
 }
 export function bufferUpperLower(a: ArtifactsBySlotVec) {
-  const minw = [...a.baseWBuffer]
-  const maxw = [...a.baseWBuffer]
+  const minw = [...a.baseLinBuf]
+  const maxw = [...a.baseLinBuf]
   Object.values(a.values).forEach(slotArts => {
     const slotUL = bufferSlotUpperLower(slotArts)
     for (let i = 0; i < minw.length; i++) {
@@ -114,12 +117,22 @@ export function bufferUpperLower(a: ArtifactsBySlotVec) {
   return { minw, maxw }
 }
 
+// Modifies in place
+export function applyLinAppx(a: ArtifactsBySlotVec, approximations: LinearVec[]) {
+  a.baseLinBuf = approximations.map(({ $c, weights }) => {
+    return $c + weights.reduce((accum, wi, i) => accum + wi * a.base[i], 0)
+  })
+  Object.values(a.values).forEach(arts => arts.forEach(art => art.linBuf = approximations.map(({ weights }) => {
+    return weights.reduce((acc, wi, i) => acc + wi * art.values[i], 0)
+  })))
+}
+
 export type ArtifactBuildDataVecDense = {
   id: string
   set?: ArtifactSetKey
   values: number[]
-  wBuffer: number[]
+  linBuf: number[]
 }
-export type ArtifactsBySlotVec = { keys: string[], base: number[], values: StrictDict<ArtifactSlotKey, ArtifactBuildDataVecDense[]>, baseWBuffer: number[] }
+export type ArtifactsBySlotVec = { keys: string[], base: number[], values: StrictDict<ArtifactSlotKey, ArtifactBuildDataVecDense[]>, baseLinBuf: number[] }
 
 export type ArtSetExclusionFull = Dict<Exclude<ArtifactSetKey, "PrayersForDestiny" | "PrayersForIllumination" | "PrayersForWisdom" | "PrayersToSpringtime"> | "uniqueKey", number[]>

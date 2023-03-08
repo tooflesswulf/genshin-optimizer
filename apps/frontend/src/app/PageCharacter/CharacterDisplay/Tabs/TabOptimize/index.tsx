@@ -32,7 +32,7 @@ import useForceUpdate from '../../../../ReactHooks/useForceUpdate';
 import useMediaQueryUp from '../../../../ReactHooks/useMediaQueryUp';
 import useTeamData, { getTeamData } from '../../../../ReactHooks/useTeamData';
 import { OptProblemInput } from '../../../../Solver';
-import { Build, mergeBuilds, mergePlot } from '../../../../Solver/common';
+import { Build, mergeBuilds, mergePlot } from '../../../../Solver/utils/common';
 import { GOSolver } from '../../../../Solver/GOSolver/GOSolver';
 import { objectKeyMap, objPathValue, range } from '../../../../Util/Util';
 import { maxBuildsToShowList } from './Build';
