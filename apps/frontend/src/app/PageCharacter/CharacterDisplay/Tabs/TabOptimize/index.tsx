@@ -51,7 +51,7 @@ import WorkerErr from './Components/WorkerErr';
 import { compactArtifacts, dynamicData } from './foreground';
 import useBuildResult from './useBuildResult';
 import useBuildSetting from './useBuildSetting';
-// import { BNBVecSolver } from '../../../../Solver/BNBVecSolver/BNBVecSolver';
+import { BNBVecSolver } from '../../../../Solver/BNBVecSolver/BNBVecSolver';
 import { ICachedArtifact } from '../../../../Types/artifact';
 
 const audio = new Audio("notification.mp3")
@@ -210,8 +210,8 @@ export default function TabBuild() {
 
     const cancellationError = new Error()
     try {
-      const solver = new GOSolver(problem, status, maxWorkers)
-      // const solver = new BNBVecSolver(problem, status, maxWorkers)
+      // const solver = new GOSolver(problem, status, maxWorkers)
+      const solver = new BNBVecSolver(problem, status, maxWorkers)
       cancelled.then(() => solver.cancel(cancellationError))
 
       const results = await solver.solve()
