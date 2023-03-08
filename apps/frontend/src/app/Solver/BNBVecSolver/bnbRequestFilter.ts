@@ -10,7 +10,7 @@ export function countFilterSize(filters: BNBRequestFilter[]) {
     tot + allArtifactSlotKeys.reduce((_cnt, slot) => _cnt * filter[slot].length, 1), 0)
 }
 
-export function filterArts(arts: ArtifactsBySlot, { filter }: BNBRequestFilter): ArtifactsBySlot {
+export function filterArtsBNB(arts: ArtifactsBySlot, { filter }: BNBRequestFilter): ArtifactsBySlot {
   return {
     base: arts.base,
     values: objectKeyMap(allArtifactSlotKeys, slot =>
@@ -19,12 +19,23 @@ export function filterArts(arts: ArtifactsBySlot, { filter }: BNBRequestFilter):
   }
 }
 
-export function joinFilters(filters: BNBRequestFilter[]): BNBRequestFilter {
-  return {
-    filter: filters[0].filter,
-    lower: filters[0].lower,
-    upper: filters[0].upper,
-    minw: filters[0].minw,
-    maxw: filters[0].maxw,
+export function filterMinMax(filters: BNBRequestFilter[]): Omit<BNBRequestFilter, 'filter'> {
+  const out = {
+    lower: [...filters[0].lower],
+    upper: [...filters[0].upper],
+    minLinBuf: [...filters[0].minLinBuf],
+    maxLinBuf: [...filters[0].maxLinBuf],
   }
+
+  filters.forEach(({ lower, upper, maxLinBuf, minLinBuf }) => {
+    for (let i = 0; i < lower.length; i++) {
+      out.lower[i] = Math.min(lower[i], out.lower[i])
+      out.upper[i] = Math.max(upper[i], out.upper[i])
+    }
+    for (let j = 0; j < minLinBuf.length; j++) {
+      out.minLinBuf[j] = Math.min(minLinBuf[j], out.minLinBuf[j])
+      out.maxLinBuf[j] = Math.max(maxLinBuf[j], out.maxLinBuf[j])
+    }
+  })
+  return out
 }

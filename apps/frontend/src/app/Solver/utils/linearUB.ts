@@ -24,9 +24,8 @@ export function linearUB(nodes: OptNode[], arts: ArtifactsBySlot): Linear[] {
 }
 export function linearUBExpandedVec(formulas: ExpandedFormulas, artsVec: ArtifactsBySlotVec): LinearVec[] {
   const polys = polyUBExpandedVec(formulas, artsVec)
-  const upperLower = statsUpperLowerVec(artsVec)
-  const minMax = {} as DynMinMax
-  artsVec.keys.forEach((k, i) => minMax[k] = { min: upperLower.lower[i], max: upperLower.upper[i] })
+  const { lower, upper } = statsUpperLowerVec(artsVec)
+  const minMax = Object.fromEntries(artsVec.keys.map((k, i) => ([k, { min: lower[i], max: upper[i] }])))
   const lins = _linearUB(polys, minMax)
 
   return lins.map(lin => ({ $c: lin.$c, weights: artsVec.keys.map(k => lin[k] ?? 0) }))

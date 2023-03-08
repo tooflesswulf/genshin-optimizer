@@ -37,9 +37,9 @@ export class BNBVecSolver extends WorkerCoordinator<BNBCommand, BNBResult> {
   }
 
   async solve() {
+    this.finalizedResults = []
     await this.execute([{ command: 'split', threshold: -Infinity, subproblem: this.initialProblem }])
     this.notifiedBroadcast({ command: 'finalize' })
-    console.log('done???')
     await this.execute([])
     return this.finalizedResults
   }
@@ -118,7 +118,7 @@ export class BNBVecSolver extends WorkerCoordinator<BNBCommand, BNBResult> {
 export type BNBRequestFilter = {
   filter: StrictDict<ArtifactSlotKey, number[]>
   lower: number[], upper: number[]
-  minw: number[], maxw: number[]
+  minLinBuf: number[], maxLinBuf: number[]
 }
 
 type BNBSubproblemBase = {
@@ -136,7 +136,7 @@ export type BNBSubproblemWithCache = {
 export type BNBSubproblem = BNBSubproblemNoCache | BNBSubproblemWithCache
 
 export type BNBCommand = SetupBNB | SplitBNB | EnumerateBNB | Threshold | Finalize
-export type BNBResult = SplitBNBResult | Interim | FinalizeResult | Done
+export type BNBResult = Interim | FinalizeResult | Done
 
 export interface SetupBNB {
   command: 'setup'
@@ -156,12 +156,11 @@ export interface SplitBNB {
 }
 export interface EnumerateBNB {
   command: 'enumerate'
-  threshold: number
-  subproblem: BNBSubproblem
+  filters: BNBRequestFilter[]
 }
 
-export interface SplitBNBResult {
-  resultType: 'split'
-  ready: boolean
-  subproblems: BNBSubproblem[]
-}
+// export interface SplitBNBResult {
+//   resultType: 'split'
+//   ready: boolean
+//   subproblems: BNBSubproblem[]
+// }

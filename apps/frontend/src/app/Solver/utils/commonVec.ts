@@ -78,20 +78,20 @@ export function slotUpperLowerVec(arts: ArtifactBuildDataVecDense[]) {
 export function statsUpperLowerVec(a: ArtifactsBySlotVec) {
   const lower = [...a.base]
   const upper = [...a.base]
-  const minw = [...a.baseLinBuf]
-  const maxw = [...a.baseLinBuf]
+  const minLinBuf = [...a.baseLinBuf]
+  const maxLinBuf = [...a.baseLinBuf]
   Object.values(a.values).forEach(slotArts => {
     const slotUL = slotUpperLowerVec(slotArts)
     for (let i = 0; i < lower.length; i++) {
       lower[i] += slotUL.lower[i]
       upper[i] += slotUL.upper[i]
     }
-    for (let i = 0; i < minw.length; i++) {
-      minw[i] += slotUL.minw[i]
-      maxw[i] += slotUL.maxw[i]
+    for (let i = 0; i < minLinBuf.length; i++) {
+      minLinBuf[i] += slotUL.minw[i]
+      maxLinBuf[i] += slotUL.maxw[i]
     }
   })
-  return { lower, upper, minw, maxw }
+  return { lower, upper, minLinBuf, maxLinBuf }
 }
 export function bufferSlotUpperLower(arts: ArtifactBuildDataVecDense[]) {
   const minw = [...arts[0].linBuf]
