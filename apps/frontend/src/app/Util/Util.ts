@@ -143,9 +143,17 @@ export function assertUnreachable(value: never): never {
   throw new Error(`Should not reach this with value ${value}`)
 }
 
-// cartesian product of list of arrays
+/** cartesian product of list of arrays */
 export function cartesian<T>(...q: T[][]): T[][] {
   return q.reduce((a, b) => a.flatMap(d => b.map(e => [d, [e]].flat())), [[]] as T[][])
+}
+
+/** Arbitrarily divides `arr` into `n` similar length arrays. */
+export function partition<T>(arr: T[], n: number): T[][] {
+  const rest = arr.length % n
+  const size = Math.floor(arr.length / n)
+  let j = 0;
+  return Array.from({ length: n }, (_, i) => arr.slice(j, j += size + (i < rest ? 1 : 0)));
 }
 
 /** Will change `arr` in-place */
@@ -158,6 +166,20 @@ export function toggleInArr<T>(arr: T[], value: T) {
 
 export function toggleArr<T>(arr: T[], value: T) {
   return arr.includes(value) ? arr.filter(a => a !== value) : [...arr, value]
+}
+
+/** Gives indices where `pred` is true. */
+export function argWhere<T>(arr: T[], pred: (x: T) => boolean): number[] {
+  return arr.reduce((ixs, ai, i) => {
+    if (pred(ai)) ixs.push(i)
+    return ixs
+  }, [] as number[])
+}
+
+/** Gives index mapping for mask `arr`. Inverse operation for argWhere. */
+export function reindex(arr: boolean[]) {
+  let i = 0
+  return arr.map(v => v ? i++ : -1)
 }
 
 export function deepFreeze<T>(obj: T, layers = 5): T {

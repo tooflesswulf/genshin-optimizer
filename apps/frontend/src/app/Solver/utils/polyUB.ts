@@ -55,12 +55,15 @@ export function polyUB(nodes: OptNode[], arts: ArtifactsBySlot): SumOfMonomials[
   const statMinMax = computeFullArtRange(arts)
   return _polyUB(nodes, statMinMax)
 }
-export function polyUBExpandedVec({ formulas, atoms }: ExpandedFormulas, artsVec: ArtifactsBySlotVec): SumOfMonomials[] {
+export function polyUBExpandedVec(formulas: ExpandedFormulas, artsVec: ArtifactsBySlotVec): SumOfMonomials[] {
   const minmax = statsUpperLowerVec(artsVec)
-  const statMinMax = {} as DynMinMax
-  artsVec.keys.forEach((k, i) => statMinMax[k] = { min: minmax.lower[i], max: minmax.upper[i] })
-  const polyAtoms = _polyUB(atoms, statMinMax)
+  return polyUBExpanded(formulas, { ...minmax, keys: artsVec.keys })
+}
+export function polyUBExpanded({ formulas, atoms }: ExpandedFormulas, vMinMax: { lower: number[], upper: number[], keys: string[] }): SumOfMonomials[] {
+  const { lower, upper, keys } = vMinMax
+  const minMax = Object.fromEntries(keys.map((k, i) => ([k, { min: lower[i], max: upper[i] }])))
 
+  const polyAtoms = _polyUB(atoms, minMax)
   const polyUBs = formulas.map(factors => {
     const factorPoly = sumM(...factors.map(({ $k, terms }) =>
       prodM([constM($k)], ...terms.map(i => polyAtoms[i]))

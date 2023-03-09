@@ -1,10 +1,11 @@
 import type { Interim } from '..'
-import type { BNBRequestFilter, SetupBNB } from './BNBVecSolver'
+import type { SetupBNB } from './BNBVecSolver'
 import { ArtifactBuildData, ArtifactsBySlot, Build, DynStat, PlotData, mergePlot } from '../utils/common'
 import { ArtSetExclusionFull, ArtifactsBySlotVec } from '../utils/commonVec'
 import { OptNode, optimize, precompute } from '../../Formula/optimization'
 import { filterArtsBNB, filterMinMax } from './bnbRequestFilter'
 import { simplifyFormula } from '../utils/boundedFormulaUtils'
+import { BNBRequestFilter } from './bnbSubproblem'
 
 /* Returns true if `setKeyCounts` respects `excl` */
 function checkArtSetExclusion(setKeyCounts: DynStat, excl: ArtSetExclusionFull) {

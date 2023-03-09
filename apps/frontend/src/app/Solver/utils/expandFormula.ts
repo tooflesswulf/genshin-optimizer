@@ -2,7 +2,9 @@ import { ArtifactSetKey, allArtifactSetKeys } from "@genshin-optimizer/consts"
 import { customMapFormula } from "../../Formula/internal"
 import { OptNode } from "../../Formula/optimization"
 import { deepCmpNode } from "../../Formula/utils"
-import { cartesian } from "../../Util/Util"
+import { cartesian, reindex } from "../../Util/Util"
+import { DynMinMax } from "./common"
+import { simplifyFormula } from "./boundedFormulaUtils"
 
 type SumFactors = {
   $k: number
@@ -13,10 +15,10 @@ export type ExpandedFormulas = {
   atoms: OptNode[]
 }
 
-function sumMT(...mterms: SumFactors[]): SumFactors {
+function sumSF(...mterms: SumFactors[]): SumFactors {
   return mterms.flat()
 }
-function prodMT(...mterms: SumFactors[]): SumFactors {
+function prodSF(...mterms: SumFactors[]): SumFactors {
   return cartesian(...mterms).map(mterm => mterm.reduce((ret, nxt) => {
     ret.$k *= nxt.$k
     ret.terms.push(...nxt.terms)
@@ -58,9 +60,9 @@ export function expandFormulas(nodes: OptNode[]): ExpandedFormulas {
 
     switch (operation) {
       case 'add':
-        return sumMT(...f.operands.map(n => map(n)))
+        return sumSF(...f.operands.map(n => map(n)))
       case 'mul':
-        return prodMT(...f.operands.map(n => map(n)))
+        return prodSF(...f.operands.map(n => map(n)))
       case 'const':
         return [{ $k: f.value, terms: [] }]
       default:
@@ -87,17 +89,17 @@ function sortFactors(formulas: SumFactors[]) {
   })
 }
 
-// Assumes `fs` is already sorted. Does not modify
+// Assumes `formulas` is already sorted. Does not modify
 function foldFactors(formulas: SumFactors[]): SumFactors[] {
   return formulas.map(factors => {
     const newFactors = [] as SumFactors
     let prv: SumFactors[0] | undefined = undefined
-    factors.forEach(factor => {
-      if (prv && prv.terms.every((pi, i) => pi === factor.terms[i])) {
-        prv.$k += factor.$k
+    factors.forEach(({ $k, terms }) => {
+      if (prv && prv.terms.length === terms.length && prv.terms.every((pi, i) => pi === terms[i])) {
+        prv.$k += $k
         return
       }
-      prv = { ...factor }
+      prv = { $k, terms }
       newFactors.push(prv)
       return
     })
@@ -131,4 +133,28 @@ function filterProductPossible(formulas: ExpandedFormulas, numSlots = 5) {
     })
   )
   return formulas
+}
+
+export function simplifyExpandedFormula({ formulas, atoms }: ExpandedFormulas, minMax: DynMinMax): ExpandedFormulas {
+  const atoms2 = simplifyFormula(atoms, minMax)
+  // todo? check if atoms2 has sum/product forms; happens when min/max gets simplified out
+  // todo: remove atoms not unsed in the formulas
+
+  const newAtoms = atoms2.filter(atm => atm.operation !== 'const')
+  const atomRix = reindex(atoms2.map(atm => atm.operation !== 'const'))
+
+  const newFormulas = formulas.map(factors =>
+    factors.map(({ $k, terms }) => {
+      const newK = terms.reduce((k, i) => {
+        const atm = atoms2[i]
+        if (atm.operation === 'const') return k * atm.value
+        return k
+      }, $k)
+      const newTerms = terms.filter(i => atomRix[i] >= 0).map(i => atomRix[i])
+      return { $k: newK, terms: newTerms }
+    })
+  )
+
+  sortFactors(newFormulas)
+  return { formulas: foldFactors(newFormulas), atoms: newAtoms }
 }

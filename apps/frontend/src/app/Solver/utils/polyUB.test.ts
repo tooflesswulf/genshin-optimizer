@@ -28,7 +28,7 @@ const crcd = sum(1, prod(customRead(['dyn', 'critRate_']), customRead(['dyn', 'c
 const crcd0 = sum(1, prod(max(sum(customRead(['dyn', 'critRate_']), -.3), 0), customRead(['dyn', 'critDMG_'])))
 const dmg_ = sum(1, customRead(['dyn', 'hydroDmg_']), threshold(customRead(['dyn', 'HeartOfDepth']), 2, .2, 0), threshold(customRead(['dyn', 'HeartOfDepth']), 4, .35, 0))
 const er = customRead(['dyn', 'enerRech_'])
-const em = prod(2.78, frac(customRead(['dyn', 'eleMas']), 1400))
+const em = sum(1, prod(2.78, frac(customRead(['dyn', 'eleMas']), 1400)))
 const ohc = customRead(['dyn', 'OceanHuedClam'])
 const exampleArts: ArtifactsBySlot = {
   base: { 'hp': 13471, 'hp_': .496, 'atk': 842, 'def': 657, 'enerRech_': 1, 'hydroDmg_': .288, 'critDMG_': .5, 'critRate_': .05 },

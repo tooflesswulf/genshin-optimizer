@@ -1,9 +1,10 @@
 // Utility functions for dealing with Union of BNBFilter(s)
 
-import { allArtifactSlotKeys } from "@genshin-optimizer/consts";
-import { BNBRequestFilter } from "./BNBVecSolver";
+import { ArtifactSlotKey, allArtifactSlotKeys } from "@genshin-optimizer/consts";
 import { ArtifactsBySlot } from "../utils/common";
 import { objectKeyMap } from "../../Util/Util";
+import { BNBRequestFilter } from "./bnbSubproblem";
+import { ArtifactsBySlotVec, filterArtsIx, filterArtsVec, statsUpperLowerVec } from "../utils/commonVec";
 
 export function countFilterSize(filters: BNBRequestFilter[]) {
   return filters.reduce((tot, { filter }) =>
@@ -20,6 +21,8 @@ export function filterArtsBNB(arts: ArtifactsBySlot, { filter }: BNBRequestFilte
 }
 
 export function filterMinMax(filters: BNBRequestFilter[]): Omit<BNBRequestFilter, 'filter'> {
+  if (filters.length === 0)
+    return { lower: [], upper: [], minLinBuf: [], maxLinBuf: [] }
   const out = {
     lower: [...filters[0].lower],
     upper: [...filters[0].upper],
@@ -38,4 +41,19 @@ export function filterMinMax(filters: BNBRequestFilter[]): Omit<BNBRequestFilter
     }
   })
   return out
+}
+
+export function updateLinBuf(artsVec: ArtifactsBySlotVec, filters: BNBRequestFilter[]) {
+  filters.forEach(filter => {
+    const artsv = filterArtsIx(artsVec, filter.filter)
+    const { minLinBuf, maxLinBuf } = statsUpperLowerVec(artsv)
+    filter.minLinBuf = minLinBuf
+    filter.maxLinBuf = maxLinBuf
+  })
+}
+
+export function unionFilterArts(filters: BNBRequestFilter[]): StrictDict<ArtifactSlotKey, number[]> {
+  return objectKeyMap(allArtifactSlotKeys, slotKey => {
+    return [...new Set(filters.flatMap(({ filter }) => filter[slotKey]))]
+  })
 }

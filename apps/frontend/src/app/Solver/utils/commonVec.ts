@@ -49,7 +49,7 @@ export function filterArtsVec(arts: ArtifactsBySlotVec, filters: RequestFilter):
 /** Selects a subset according to filterVec */
 export function filterArtsIx(arts: ArtifactsBySlotVec, filterVec: StrictDict<ArtifactSlotKey, number[]>): ArtifactsBySlotVec {
   return {
-    keys: arts.keys, base: arts.base, baseLinBuf: [],
+    keys: arts.keys, base: arts.base, baseLinBuf: arts.baseLinBuf,
     values: objectKeyMap(allArtifactSlotKeys, slot => {
       const filterIxs = filterVec[slot]
       const slotVals = arts.values[slot]
@@ -59,6 +59,8 @@ export function filterArtsIx(arts: ArtifactsBySlotVec, filterVec: StrictDict<Art
 }
 
 export function slotUpperLowerVec(arts: ArtifactBuildDataVecDense[]) {
+  if (arts.length === 0)
+    return { lower: [], upper: [], minw: [], maxw: [] }
   const lower = [...arts[0].values]
   const upper = [...arts[0].values]
   const minw = [...arts[0].linBuf]

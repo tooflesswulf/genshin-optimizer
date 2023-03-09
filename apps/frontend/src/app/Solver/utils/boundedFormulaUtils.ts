@@ -3,6 +3,8 @@ import { OptNode, allOperations } from "../../Formula/optimization"
 import { constant, prod, sum } from "../../Formula/utils"
 import { DynMinMax } from "./common"
 
+// this file might be replaceable by Formula/optimize
+
 export function foldSum(nodes: readonly OptNode[]): OptNode {
   if (nodes.length === 1) return nodes[0]
   nodes = nodes.flatMap(n => n.operation === 'add' ? n.operands : n)
@@ -47,8 +49,10 @@ export function simplifyFormula(f: OptNode[], minMax: DynMinMax): OptNode[] {
         if (branch.operation === 'const' && branchVal.operation === 'const')
           return branch.value >= branchVal.value ? ge : lt
         if (branch.operation === 'read' && branchVal.operation === 'const') {
-          if (minMax[branch.path[1]].min >= branchVal.value) return ge
-          if (minMax[branch.path[1]].max < branchVal.value) return lt
+          const mmb = minMax[branch.path[1]]
+          if (!mmb) return n
+          if (mmb.min >= branchVal.value) return ge
+          if (mmb.max < branchVal.value) return lt
         }
         return n
       }

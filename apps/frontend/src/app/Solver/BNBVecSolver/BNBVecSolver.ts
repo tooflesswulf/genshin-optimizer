@@ -1,5 +1,5 @@
 import { ArtifactSlotKey, allArtifactSlotKeys } from "@genshin-optimizer/consts"
-import { Count, CountResult, Done, Finalize, FinalizeResult, Interim, OptProblemInput, Threshold } from ".."
+import { Done, Finalize, FinalizeResult, Interim, OptProblemInput, Threshold } from ".."
 import { OptNode, optimize } from "../../Formula/optimization"
 import { ArtifactsBySlot, pruneAll, pruneExclusion } from "../utils/common"
 import { WorkerCoordinator } from "../coordinator"
@@ -7,14 +7,15 @@ import { ArtSetExclusionFull, ArtifactsBySlotVec, applyLinAppx, statsUpperLowerV
 import { elimLinDepStats, thresholdExclusions, thresholdToConstBranchForm } from "../utils/preprocessing"
 import { objectKeyMap, objectKeyValueMap } from "../../Util/Util"
 import { ExpandedFormulas, expandFormulas } from "../utils/expandFormula"
-import { Linear, LinearVec, linearUBExpandedVec } from "../utils/linearUB"
+import { LinearVec, linearUBExpandedVec } from "../utils/linearUB"
+import { BNBRequestFilter, BNBSubproblem } from "./bnbSubproblem"
 
 export class BNBVecSolver extends WorkerCoordinator<BNBCommand, BNBResult> {
   private status: Record<'tested' | 'failed' | 'skipped' | 'total', number>
   private topN: number
   private buildValues: { w: Worker, val: number }[]
   private finalizedResults: FinalizeResult[] = []
-  private initialProblem: BNBSubproblemNoCache
+  private initialProblem: BNBSubproblem
 
   constructor(problem: OptProblemInput, status: BNBVecSolver['status'], numWorker: number) {
     const workers = Array(numWorker).fill(NaN).map(_ => new Worker(new URL('./BNBVecBackgroundWorker.ts', import.meta.url)))
@@ -28,23 +29,23 @@ export class BNBVecSolver extends WorkerCoordinator<BNBCommand, BNBResult> {
     const { topN } = problem
     this.status = status
     this.topN = topN
-    this.buildValues = Array(topN).fill({ w: undefined as any, val: -Infinity })
+    this.buildValues = Array(topN).fill({ w: undefined as unknown, val: -Infinity })
 
     const { setupCommand, initialProblem } = this.preprocess(problem)
     this.initialProblem = initialProblem
-    this.status.total = Object.values(initialProblem.unionFilters[0]?.filter).reduce((tot, slotArts) => tot * slotArts.length, 1)
+    this.status.total = Object.values(initialProblem.unionFilter[0]?.filter).reduce((tot, slotArts) => tot * slotArts.length, 1)
     this.notifiedBroadcast(setupCommand)
   }
 
   async solve() {
     this.finalizedResults = []
-    await this.execute([{ command: 'split', threshold: -Infinity, subproblem: this.initialProblem }])
+    await this.execute([{ command: 'split', maxIterateSize: 40_000, subproblem: this.initialProblem }])
     this.notifiedBroadcast({ command: 'finalize' })
     await this.execute([])
     return this.finalizedResults
   }
 
-  preprocess({ plotBase, optimizationTarget, arts, topN, exclusion, constraints }: OptProblemInput): { setupCommand: SetupBNB, initialProblem: BNBSubproblemNoCache } {
+  preprocess({ plotBase, optimizationTarget, arts, topN, exclusion, constraints }: OptProblemInput): { setupCommand: SetupBNB, initialProblem: BNBSubproblem } {
     constraints = constraints.filter(x => x.min > -Infinity)
 
     let nodes = [...constraints.map(x => x.value), optimizationTarget]
@@ -89,8 +90,10 @@ export class BNBVecSolver extends WorkerCoordinator<BNBCommand, BNBResult> {
         artSetExclusion: exclusionFull,
       },
       initialProblem: {
-        cache: false, depth: 0,
-        formulas, unionFilters: [initialFilter],
+        cache: true, depth: 0,
+        lin: approximations, targetIxs,
+        formulas, unionFilter: [initialFilter],
+        minimums, exclusion: exclusionFull
       }
     }
   }
@@ -104,8 +107,8 @@ export class BNBVecSolver extends WorkerCoordinator<BNBCommand, BNBResult> {
     if (r.buildValues) {
       const { topN } = this, oldThreshold = this.buildValues[topN - 1].val ?? -Infinity
 
-      this.buildValues.filter(({ w }) => w !== worker)
-      this.buildValues.push(...r.buildValues.map(val => ({ w: worker!, val })))
+      // this.buildValues.filter(({ w }) => w !== worker)
+      this.buildValues.push(...r.buildValues.map(val => ({ w: worker, val })))
       this.buildValues.sort((a, b) => b.val - a.val).splice(topN)
 
       const threshold = this.buildValues[topN - 1].val ?? -Infinity
@@ -114,26 +117,6 @@ export class BNBVecSolver extends WorkerCoordinator<BNBCommand, BNBResult> {
     }
   }
 }
-
-export type BNBRequestFilter = {
-  filter: StrictDict<ArtifactSlotKey, number[]>
-  lower: number[], upper: number[]
-  minLinBuf: number[], maxLinBuf: number[]
-}
-
-type BNBSubproblemBase = {
-  formulas: ExpandedFormulas
-  unionFilters: BNBRequestFilter[]
-  depth: number
-}
-export type BNBSubproblemNoCache = {
-  cache: false
-} & BNBSubproblemBase
-export type BNBSubproblemWithCache = {
-  cache: true
-  lin: LinearVec[]
-} & BNBSubproblemBase
-export type BNBSubproblem = BNBSubproblemNoCache | BNBSubproblemWithCache
 
 export type BNBCommand = SetupBNB | SplitBNB | EnumerateBNB | Threshold | Finalize
 export type BNBResult = Interim | FinalizeResult | Done
@@ -151,7 +134,7 @@ export interface SetupBNB {
 }
 export interface SplitBNB {
   command: 'split'
-  threshold: number
+  maxIterateSize: number
   subproblem: BNBSubproblem
 }
 export interface EnumerateBNB {
