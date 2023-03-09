@@ -27,17 +27,19 @@ export class BNBVecSplitWorker {
   }
 
   setThreshold(threshold: number) {
+    console.log('updating thr to ', threshold, 'from', this.threshold, 'wait...', this.subproblems.length)
     this.threshold = Math.max(threshold, this.threshold)
     console.log('updating thr to ', this.threshold)
   }
   addSubproblem(subproblem: BNBSubproblem) { this.subproblems.push(subproblem) }
 
-  split(minCount: number): BNBSubproblem | undefined {
+  *split(minCount: number): Generator<BNBSubproblem | undefined> {
     while (this.subproblems.length) {
       const subproblem = this.subproblems.pop()!
       const count = countFilterSize(subproblem?.unionFilter)
       if (count <= minCount) {
-        return subproblem
+        yield subproblem
+        continue
       }
 
       const newProblems = this.splitBNB(subproblem)
@@ -45,8 +47,9 @@ export class BNBVecSplitWorker {
       if (this.interim) this.interim.skipped += count - newCount
       else this.interim = { resultType: 'interim', tested: 0, failed: 0, skipped: count - newCount, buildValues: undefined }
       this.subproblems.push(...newProblems)
-      return
+      this.reportInterim()
     }
+
     this.reportInterim(true)
   }
 

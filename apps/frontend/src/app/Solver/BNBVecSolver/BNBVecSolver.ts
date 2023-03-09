@@ -21,6 +21,7 @@ export class BNBVecSolver extends WorkerCoordinator<BNBCommand, BNBResult> {
     const workers = Array(numWorker).fill(NaN).map(_ => new Worker(new URL('./BNBVecBackgroundWorker.ts', import.meta.url)))
     super(workers, ['enumerate', 'split'], (r, w) => {
       switch (r.resultType) {
+        case 'checkin': w.postMessage({ command: 'resume' }); break
         case 'interim': this.interim(r, w); break
         case 'finalize': this.finalizedResults.push(r); break
       }
@@ -118,8 +119,8 @@ export class BNBVecSolver extends WorkerCoordinator<BNBCommand, BNBResult> {
   }
 }
 
-export type BNBCommand = SetupBNB | SplitBNB | EnumerateBNB | Threshold | Finalize
-export type BNBResult = Interim | FinalizeResult | Done
+export type BNBCommand = SetupBNB | SplitBNB | EnumerateBNB | Resume | Threshold | Finalize
+export type BNBResult = CheckinResult | Interim | FinalizeResult | Done
 
 export interface SetupBNB {
   command: 'setup'
@@ -140,6 +141,13 @@ export interface SplitBNB {
 export interface EnumerateBNB {
   command: 'enumerate'
   filters: BNBRequestFilter[]
+}
+
+export interface Resume {
+  command: 'resume'
+}
+export interface CheckinResult {
+  resultType: 'checkin'
 }
 
 // export interface SplitBNBResult {

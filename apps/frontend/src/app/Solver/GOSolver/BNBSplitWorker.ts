@@ -70,6 +70,7 @@ export class BNBSplitWorker implements SplitWorker {
     this.addFilter(filter)
 
     while (this.filters.length) {
+      console.log({ thr: this.min[0] })
       const filter = this.getApproxFilter(), { arts, count } = filter
 
       if (count <= minCount) {
