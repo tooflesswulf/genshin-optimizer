@@ -7,15 +7,23 @@ declare function postMessage(command: BNBCommand | BNBResult): void
 let computeWorker: BNBVecEnumerateWorker, splitWorker: BNBVecSplitWorker
 let maxIterateSize: number
 
-onmessage = async (e: MessageEvent<BNBCommand>) => {
+onmessage = (e: MessageEvent<BNBCommand>) => {
   const { data } = e, { command } = data
   switch (command) {
     case 'setup':
       computeWorker = new BNBVecEnumerateWorker(data, x => postMessage(x))
       splitWorker = new BNBVecSplitWorker(data, x => postMessage(x))
-      console.log('CONSTRUCT SPLITTER I GUESS?')
       postMessage({ resultType: 'done' })
       break
+    case 'share': {
+      console.log('Requested to share (b4)', splitWorker.subproblems.length)
+      const toShare = splitWorker.shareWork(data.splitsToAdd)
+      console.log('Requested to share work. Worker has N:', splitWorker.subproblems.length, { toShare })
+      toShare.forEach(subproblem => {
+        postMessage({ command: 'split', maxIterateSize, subproblem })
+      })
+      break
+    }
     case 'split':
       splitWorker.addSubproblem(data.subproblem)
       maxIterateSize = data.maxIterateSize
@@ -23,9 +31,10 @@ onmessage = async (e: MessageEvent<BNBCommand>) => {
     case 'resume': {
       let i = 0
       for (const subproblem of splitWorker.split(maxIterateSize)) {
-        console.log('what is happening', splitWorker.threshold)
         if (subproblem) postMessage({ command: 'enumerate', filters: subproblem.unionFilter })
         if (i++ > 5) {
+          // Allow thresholds to be resolved, accept requests from coordinator
+          console.log('split worker has', { numProb: splitWorker.subproblems.length, depth: splitWorker.subproblems.at(-1)?.depth })
           postMessage({ resultType: 'checkin' })
           return
         }
@@ -36,11 +45,11 @@ onmessage = async (e: MessageEvent<BNBCommand>) => {
     case 'threshold':
       computeWorker.setThreshold(data.threshold)
       splitWorker.setThreshold(data.threshold)
-      console.log('what is happening??!?', splitWorker.threshold)
       break  // Must not send 'done'
     case "enumerate":
       computeWorker.enumerate(data.filters)
-      postMessage({ resultType: 'done' })
+      if (!data.interrupt)
+        postMessage({ resultType: 'done' })
       break
     case "finalize": {
       computeWorker.refresh(true)

@@ -26,11 +26,7 @@ export class BNBVecSplitWorker {
     this.callback = callback
   }
 
-  setThreshold(threshold: number) {
-    console.log('updating thr to ', threshold, 'from', this.threshold, 'wait...', this.subproblems.length)
-    this.threshold = Math.max(threshold, this.threshold)
-    console.log('updating thr to ', this.threshold)
-  }
+  setThreshold(threshold: number) { this.threshold = Math.max(threshold, this.threshold) }
   addSubproblem(subproblem: BNBSubproblem) { this.subproblems.push(subproblem) }
 
   *split(minCount: number): Generator<BNBSubproblem | undefined> {
@@ -60,19 +56,25 @@ export class BNBVecSplitWorker {
     }
   }
 
-  // TODO: figure out logic
-  splitOnce() {
-    const problem = this.subproblems.pop()
-    if (!problem) return
+  shareWork(numShareTo: number) {
+    const out = [] as BNBSubproblem[]
+    for (let i = 0; i < numShareTo; i++) {
+      if (this.subproblems.length <= 1) break
+      out.push(this.subproblems.shift()!)
+    }
+
+    console.log({ numShareTo, nprob: this.subproblems.length })
+
+    return out
   }
 
   splitBNB(subproblem: BNBSubproblem): BNBSubproblem[] {
     const threshold = this.threshold
-    console.log('thrr', { threshold })
 
     // 1. discard filters that don't meet threshold(s) & minimums
     applyLinAppx(this.artsVec, subproblem.lin)
     updateLinBuf(this.artsVec, subproblem.unionFilter)
+
     subproblem = pruneSubproblem(threshold, subproblem)
     const { targetIxs, unionFilter: filters } = subproblem
     const objIx = targetIxs[0]

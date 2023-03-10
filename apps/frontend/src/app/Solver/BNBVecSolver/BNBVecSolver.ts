@@ -1,13 +1,13 @@
-import { ArtifactSlotKey, allArtifactSlotKeys } from "@genshin-optimizer/consts"
+import { allArtifactSlotKeys } from "@genshin-optimizer/consts"
 import { Done, Finalize, FinalizeResult, Interim, OptProblemInput, Threshold } from ".."
 import { OptNode, optimize } from "../../Formula/optimization"
 import { ArtifactsBySlot, pruneAll, pruneExclusion } from "../utils/common"
 import { WorkerCoordinator } from "../coordinator"
 import { ArtSetExclusionFull, ArtifactsBySlotVec, applyLinAppx, statsUpperLowerVec, toArtifactsBySlotVec } from "../utils/commonVec"
 import { elimLinDepStats, thresholdExclusions, thresholdToConstBranchForm } from "../utils/preprocessing"
-import { objectKeyMap, objectKeyValueMap } from "../../Util/Util"
-import { ExpandedFormulas, expandFormulas } from "../utils/expandFormula"
-import { LinearVec, linearUBExpandedVec } from "../utils/linearUB"
+import { objectKeyMap, objectKeyValueMap, range } from "../../Util/Util"
+import { expandFormulas } from "../utils/expandFormula"
+import { linearUBExpandedVec } from "../utils/linearUB"
 import { BNBRequestFilter, BNBSubproblem } from "./bnbSubproblem"
 
 export class BNBVecSolver extends WorkerCoordinator<BNBCommand, BNBResult> {
@@ -21,9 +21,21 @@ export class BNBVecSolver extends WorkerCoordinator<BNBCommand, BNBResult> {
     const workers = Array(numWorker).fill(NaN).map(_ => new Worker(new URL('./BNBVecBackgroundWorker.ts', import.meta.url)))
     super(workers, ['enumerate', 'split'], (r, w) => {
       switch (r.resultType) {
-        case 'checkin': w.postMessage({ command: 'resume' }); break
         case 'interim': this.interim(r, w); break
         case 'finalize': this.finalizedResults.push(r); break
+        case 'checkin': {
+          if (this.commands.every(fifo => fifo.length === 0))
+            w.postMessage({ command: 'share', splitsToAdd: numWorker })
+
+          const i = this.prio.get('enumerate')!
+          const numToPop = Math.ceil(this.commands[i].length / numWorker)
+          const toPostArr = range(1, numToPop).map(_ => this.commands[i].dequeue()! as EnumerateBNB)
+          toPostArr.forEach(toPost => {
+            toPost.interrupt = true
+            w.postMessage(toPost)
+          })
+          w.postMessage({ command: 'resume' }); break
+        }
       }
     })
 
@@ -119,7 +131,7 @@ export class BNBVecSolver extends WorkerCoordinator<BNBCommand, BNBResult> {
   }
 }
 
-export type BNBCommand = SetupBNB | SplitBNB | EnumerateBNB | Resume | Threshold | Finalize
+export type BNBCommand = SetupBNB | SplitBNB | EnumerateBNB | ShareBNB | Resume | Threshold | Finalize
 export type BNBResult = CheckinResult | Interim | FinalizeResult | Done
 
 export interface SetupBNB {
@@ -141,8 +153,13 @@ export interface SplitBNB {
 export interface EnumerateBNB {
   command: 'enumerate'
   filters: BNBRequestFilter[]
+  interrupt?: boolean  // Whether this needs to return 'done' or not
 }
 
+export interface ShareBNB {
+  command: 'share'
+  splitsToAdd: number
+}
 export interface Resume {
   command: 'resume'
 }
