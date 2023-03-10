@@ -4,7 +4,7 @@ import { OptNode, allOperations } from "../../Formula/optimization";
 import { ConstantNode } from "../../Formula/type";
 import { prod, threshold } from "../../Formula/utils";
 import { assertUnreachable, cartesian } from "../../Util/Util";
-import { ArtifactsBySlot, MinMax, computeFullArtRange, computeNodeRange } from "../common";
+import { ArtifactsBySlot, MinMax, computeFullArtRange, computeNodeRange } from "../utils/common";
 import { Linear } from "./linearUB";
 
 /**

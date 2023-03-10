@@ -1,8 +1,8 @@
 import { OptNode, precompute } from "../../Formula/optimization"
 import { constant, customRead, max, min, prod, res, sum, threshold, frac } from "../../Formula/utils"
 import { cartesian } from "../../Util/Util"
-import { ArtifactsBySlot } from "../common"
-import { DynStat } from "../common"
+import { ArtifactsBySlot } from "../utils/common"
+import { DynStat } from "../utils/common"
 import { Linear, linearUB } from "./linearUB"
 import { SumOfMonomials, polyUB } from "./polyUB"
 

@@ -1,6 +1,6 @@
 import { OptNode } from "../../Formula/optimization";
 import { assertUnreachable, cartesian } from "../../Util/Util";
-import { ArtifactsBySlot, DynStat, MinMax, computeFullArtRange } from "../common";
+import { ArtifactsBySlot, DynStat, MinMax, computeFullArtRange } from "../utils/common";
 import { polyUB } from "./polyUB";
 import { solveLP } from "./solveLP";
 
