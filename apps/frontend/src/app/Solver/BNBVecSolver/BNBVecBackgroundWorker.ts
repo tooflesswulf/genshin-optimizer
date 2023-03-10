@@ -34,7 +34,6 @@ onmessage = (e: MessageEvent<BNBCommand>) => {
         if (subproblem) postMessage({ command: 'enumerate', filters: subproblem.unionFilter })
         if (i++ > 5) {
           // Allow thresholds to be resolved, accept requests from coordinator
-          console.log('split worker has', { numProb: splitWorker.subproblems.length, depth: splitWorker.subproblems.at(-1)?.depth })
           postMessage({ resultType: 'checkin' })
           return
         }
