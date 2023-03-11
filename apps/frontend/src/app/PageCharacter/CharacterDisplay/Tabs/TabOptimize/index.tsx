@@ -96,6 +96,8 @@ export default function TabBuild() {
   const optimizationTargetNode = optimizationTarget && objPathValue(data?.getDisplay(), optimizationTarget)
   const isSM = ["xs", "sm"].includes(useMediaQueryUp())
 
+  const [vecSolver, setVecSolver] = useState(true)
+
   //register changes in artifact database
   useEffect(() =>
     database.arts.followAny(setArtsDirty),
@@ -211,7 +213,7 @@ export default function TabBuild() {
     const cancellationError = new Error()
     try {
       // const solver = new GOSolver(problem, status, maxWorkers)
-      const solver = new BNBVecSolver(problem, status, maxWorkers)
+      const solver = vecSolver ? new BNBVecSolver(problem, status, maxWorkers) : new GOSolver(problem, status, maxWorkers)
       cancelled.then(() => solver.cancel(cancellationError))
 
       const results = await solver.solve()
@@ -261,7 +263,7 @@ export default function TabBuild() {
       clearInterval(statusUpdateTimer)
       setBuildStatus({ type: "inactive", ...status, finishTime: performance.now() })
     }
-  }, [t, characterKey, filteredArts, database, buildResultDispatch, maxWorkers, buildSetting, notificationRef, setChartData, gender])
+  }, [buildSetting, characterKey, filteredArts, database, gender, setChartData, vecSolver, maxWorkers, buildResultDispatch, t])
 
   const characterName = characterSheet?.name ?? "Character Name"
 
@@ -346,95 +348,102 @@ export default function TabBuild() {
           {/*Minimum Final Stat Filter */}
           <StatFilterCard disabled={generatingBuilds} />
 
-        </Grid>
+          <CardLight style={{backgroundColor: 'red'}}>
+            <CardContent style={{backgroundColor: 'red'}}>
+              <Button startIcon={vecSolver ? <CheckBox /> : <CheckBoxOutlineBlank />} color={vecSolver ? 'success' : 'secondary'} onClick = {() => setVecSolver(!vecSolver)}>Use Unstable Solver (Id appreciate bug reports)</Button>
+          </CardContent>
+        </CardLight>
+
       </Grid>
+    </Grid>
       {/* Footer */}
-      {isSM && targetSelector}
-      <ButtonGroup>
-        {!isSM && targetSelector}
-        <DropdownButton disabled={generatingBuilds || !characterKey}
-          title={<Trans t={t} i18nKey="build" count={maxBuildsToShow}>
-            {{ count: maxBuildsToShow }} Builds
-          </Trans>}>
-          <MenuItem>
-            <Typography variant="caption" color="info.main">
-              {t("buildDropdownDesc")}
-            </Typography>
-          </MenuItem>
-          <Divider />
-          {maxBuildsToShowList.map(v => <MenuItem key={v}
-            onClick={() => buildSettingDispatch({ maxBuildsToShow: v })}>
-            <Trans t={t} i18nKey="build" count={v}>
-              {{ count: v }} Builds
-            </Trans>
-          </MenuItem>)}
-        </DropdownButton>
-        <DropdownButton disabled={generatingBuilds || !characterKey}
-          sx={{ borderRadius: "4px 0px 0px 4px" }}
-          title={<Trans t={t} i18nKey="thread" count={maxWorkers}>
-            {{ count: maxWorkers }} Threads
-          </Trans>}>
-          <MenuItem>
-            <Typography variant="caption" color="info.main">
-              {t("threadDropdownDesc")}
-            </Typography>
-          </MenuItem>
-          <Divider />
-          {range(1, defThreads).reverse().map(v => <MenuItem key={v}
-            onClick={() => setMaxWorkers(v)}>
-            <Trans t={t} i18nKey="thread" count={v}>
-              {{ count: v }} Threads
-            </Trans>
-          </MenuItem>)}
-        </DropdownButton>
-        <BootstrapTooltip placement="top" title={t`notifyTooltip`}>
-          <Button sx={{ borderRadius: 0 }} color='warning' onClick={() => setnotification(n => !n)} >
-            {notification ? <NotificationsActiveIcon /> : <NotificationsOffIcon />}
-          </Button>
-        </BootstrapTooltip>
-        <BootstrapTooltip placement="top" title={!optimizationTarget ? t("selectTargetFirst") : ""}>
-          <span>
-            <Button
-              disabled={!characterKey || !optimizationTarget || !optimizationTargetNode || optimizationTargetNode.isEmpty}
-              color={generatingBuilds ? "error" : "success"}
-              onClick={generatingBuilds ? () => cancelToken.current() : generateBuilds}
-              startIcon={generatingBuilds ? <Close /> : <TrendingUp />}
-              sx={{ borderRadius: "0px 4px 4px 0px" }}
-            >{generatingBuilds ? t("generateButton.cancel") : t("generateButton.generateBuilds")}</Button>
-          </span>
-        </BootstrapTooltip>
-      </ButtonGroup>
-      {workerErr && <WorkerErr />}
-      {!!characterKey && <BuildAlert {...{ status: buildStatus, characterName, maxBuildsToShow }} />}
-      <Box >
-        <ChartCard disabled={generatingBuilds || !optimizationTarget} plotBase={plotBase} setPlotBase={setPlotBase} showTooltip={!optimizationTarget} />
-      </Box>
-      <CardLight>
-        <CardContent>
-          <Box display="flex" alignItems="center" gap={1} mb={1} >
-            <Typography sx={{ flexGrow: 1 }}>
-              {builds ? <span>Showing <strong>{builds.length + (graphBuilds ? graphBuilds.length : 0)}</strong> build generated for {characterName}. {!!buildDate && <span>Build generated on: <strong>{(new Date(buildDate)).toLocaleString()}</strong></span>}</span>
-                : <span>Select a character to generate builds.</span>}
-            </Typography>
-            <Button disabled={!builds.length} color="error" onClick={() => { setGraphBuilds(undefined); buildResultDispatch({ builds: [], buildDate: 0 }) }} >Clear Builds</Button>
-          </Box>
-          <Grid container display="flex" spacing={1}>
-            <Grid item><HitModeToggle size="small" /></Grid>
-            <Grid item><ReactionToggle size="small" /></Grid>
-            <Grid item flexGrow={1} />
-            <Grid item><SolidToggleButtonGroup exclusive value={compareData} onChange={(_e, v) => characterDispatch({ compareData: v })} size="small">
-              <ToggleButton value={false} disabled={!compareData}>Show new builds</ToggleButton>
-              <ToggleButton value={true} disabled={compareData}>Compare vs. equipped</ToggleButton>
-            </SolidToggleButtonGroup></Grid>
-          </Grid>
-        </CardContent>
-      </CardLight>
-      <OptimizationTargetContext.Provider value={optimizationTarget}>
-        {graphBuilds && <BuildList builds={graphBuilds} characterKey={characterKey} data={data} compareData={compareData} disabled={!!generatingBuilds} getLabel={getGraphBuildLabel} setBuilds={setGraphBuilds} />}
-        <BuildList builds={builds} characterKey={characterKey} data={data} compareData={compareData} disabled={!!generatingBuilds} getLabel={getNormBuildLabel} />
-      </OptimizationTargetContext.Provider>
-    </DataContext.Provider>}
-  </Box>
+    {isSM && targetSelector}
+    <ButtonGroup>
+      {!isSM && targetSelector}
+      <DropdownButton disabled={generatingBuilds || !characterKey}
+        title={<Trans t={t} i18nKey="build" count={maxBuildsToShow}>
+          {{ count: maxBuildsToShow }} Builds
+        </Trans>}>
+        <MenuItem>
+          <Typography variant="caption" color="info.main">
+            {t("buildDropdownDesc")}
+          </Typography>
+        </MenuItem>
+        <Divider />
+        {maxBuildsToShowList.map(v => <MenuItem key={v}
+          onClick={() => buildSettingDispatch({ maxBuildsToShow: v })}>
+          <Trans t={t} i18nKey="build" count={v}>
+            {{ count: v }} Builds
+          </Trans>
+        </MenuItem>)}
+      </DropdownButton>
+      <DropdownButton disabled={generatingBuilds || !characterKey}
+        sx={{ borderRadius: "4px 0px 0px 4px" }}
+        title={<Trans t={t} i18nKey="thread" count={maxWorkers}>
+          {{ count: maxWorkers }} Threads
+        </Trans>}>
+        <MenuItem>
+          <Typography variant="caption" color="info.main">
+            {t("threadDropdownDesc")}
+          </Typography>
+        </MenuItem>
+        <Divider />
+        {range(1, defThreads).reverse().map(v => <MenuItem key={v}
+          onClick={() => setMaxWorkers(v)}>
+          <Trans t={t} i18nKey="thread" count={v}>
+            {{ count: v }} Threads
+          </Trans>
+        </MenuItem>)}
+      </DropdownButton>
+      <BootstrapTooltip placement="top" title={t`notifyTooltip`}>
+        <Button sx={{ borderRadius: 0 }} color='warning' onClick={() => setnotification(n => !n)} >
+          {notification ? <NotificationsActiveIcon /> : <NotificationsOffIcon />}
+        </Button>
+      </BootstrapTooltip>
+      <BootstrapTooltip placement="top" title={!optimizationTarget ? t("selectTargetFirst") : ""}>
+        <span>
+          <Button
+            disabled={!characterKey || !optimizationTarget || !optimizationTargetNode || optimizationTargetNode.isEmpty}
+            color={generatingBuilds ? "error" : "success"}
+            onClick={generatingBuilds ? () => cancelToken.current() : generateBuilds}
+            startIcon={generatingBuilds ? <Close /> : <TrendingUp />}
+            sx={{ borderRadius: "0px 4px 4px 0px" }}
+          >{generatingBuilds ? t("generateButton.cancel") : t("generateButton.generateBuilds")}</Button>
+        </span>
+      </BootstrapTooltip>
+    </ButtonGroup>
+    {workerErr && <WorkerErr />}
+    {!!characterKey && <BuildAlert {...{ status: buildStatus, characterName, maxBuildsToShow }} />}
+    <Box >
+      <ChartCard disabled={generatingBuilds || !optimizationTarget} plotBase={plotBase} setPlotBase={setPlotBase} showTooltip={!optimizationTarget} />
+    </Box>
+    <CardLight>
+      <CardContent>
+        <Box display="flex" alignItems="center" gap={1} mb={1} >
+          <Typography sx={{ flexGrow: 1 }}>
+            {builds ? <span>Showing <strong>{builds.length + (graphBuilds ? graphBuilds.length : 0)}</strong> build generated for {characterName}. {!!buildDate && <span>Build generated on: <strong>{(new Date(buildDate)).toLocaleString()}</strong></span>}</span>
+              : <span>Select a character to generate builds.</span>}
+          </Typography>
+          <Button disabled={!builds.length} color="error" onClick={() => { setGraphBuilds(undefined); buildResultDispatch({ builds: [], buildDate: 0 }) }} >Clear Builds</Button>
+        </Box>
+        <Grid container display="flex" spacing={1}>
+          <Grid item><HitModeToggle size="small" /></Grid>
+          <Grid item><ReactionToggle size="small" /></Grid>
+          <Grid item flexGrow={1} />
+          <Grid item><SolidToggleButtonGroup exclusive value={compareData} onChange={(_e, v) => characterDispatch({ compareData: v })} size="small">
+            <ToggleButton value={false} disabled={!compareData}>Show new builds</ToggleButton>
+            <ToggleButton value={true} disabled={compareData}>Compare vs. equipped</ToggleButton>
+          </SolidToggleButtonGroup></Grid>
+        </Grid>
+      </CardContent>
+    </CardLight>
+    <OptimizationTargetContext.Provider value={optimizationTarget}>
+      {graphBuilds && <BuildList builds={graphBuilds} characterKey={characterKey} data={data} compareData={compareData} disabled={!!generatingBuilds} getLabel={getGraphBuildLabel} setBuilds={setGraphBuilds} />}
+      <BuildList builds={builds} characterKey={characterKey} data={data} compareData={compareData} disabled={!!generatingBuilds} getLabel={getNormBuildLabel} />
+    </OptimizationTargetContext.Provider>
+  </DataContext.Provider>
+}
+  </Box >
 }
 function BuildList({ builds, setBuilds, characterKey, data, compareData, disabled, getLabel }: {
   builds: string[][]
