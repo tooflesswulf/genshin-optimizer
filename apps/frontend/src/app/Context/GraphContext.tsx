@@ -1,10 +1,10 @@
 import { createContext } from "react"
-import { NumNode } from "../Formula/type"
-import { Build } from "../Solver/utils/common"
+import type { NumNode } from "../Formula/type"
+import type { Build } from "../Solver/utils/common"
 
 export type ChartData = {
-  valueNode: NumNode,
-  plotNode: NumNode,
+  valueNode: NumNode
+  plotNode: NumNode
   data: Build[]
 }
 export type GraphContextObj = {

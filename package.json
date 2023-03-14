@@ -1,6 +1,6 @@
 {
   "name": "genshin-optimizer",
-  "version": "9.5.2",
+  "version": "9.6.0",
   "license": "MIT",
   "private": true,
   "scripts": {
@@ -82,5 +82,6 @@
     "terser-webpack-plugin": "^5.3.6",
     "tesseract.js": "^4.0.2",
     "tslib": "^2.5.0"
-  }
+  },
+  "packageManager": "yarn@3.4.1"
 }
