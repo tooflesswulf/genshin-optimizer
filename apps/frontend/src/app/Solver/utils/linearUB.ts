@@ -1,15 +1,20 @@
-import { OptNode } from "../../Formula/optimization";
-import { assertUnreachable, cartesian } from "../../Util/Util";
-import { ArtifactsBySlotVec, statsUpperLowerVec } from "./commonVec";
-import { ExpandedFormulas } from "./expandFormula";
-import { ArtifactsBySlot, DynMinMax, DynStat, MinMax, computeFullArtRange } from "./common";
-import { SumOfMonomials, polyUB, polyUBExpanded, polyUBExpandedVec } from "./polyUB";
-import { solveLP } from "./solveLP";
+import type { OptNode } from '../../Formula/optimization'
+import { assertUnreachable, cartesian } from '../../Util/Util'
+import type { ArtifactsBySlotVec } from './commonVec'
+import { statsUpperLowerVec } from './commonVec'
+import type { ExpandedFormulas } from './expandFormula'
+import type { ArtifactsBySlot, DynMinMax, DynStat, MinMax } from './common'
+import { computeFullArtRange } from './common'
+import type { SumOfMonomials } from './polyUB'
+import { polyUB, polyUBExpanded } from './polyUB'
+import { solveLP } from './solveLP'
 
 export type Linear = DynStat & { $c: number }
-export type LinearVec = { $c: number, weights: number[] }
+export type LinearVec = { $c: number; weights: number[] }
 
-function weightedSum(...entries: readonly (readonly [number, Linear])[]): Linear {
+function weightedSum(
+  ...entries: readonly (readonly [number, Linear])[]
+): Linear {
   const result = { $c: 0 }
   for (const [weight, entry] of entries)
     for (const [k, v] of Object.entries(entry))
@@ -22,33 +27,56 @@ export function linearUB(nodes: OptNode[], arts: ArtifactsBySlot): Linear[] {
   const minMax = computeFullArtRange(arts)
   return _linearUB(polys, minMax)
 }
-export function linearUBExpandedVec(formulas: ExpandedFormulas, artsVec: ArtifactsBySlotVec): LinearVec[] {
+export function linearUBExpandedVec(
+  formulas: ExpandedFormulas,
+  artsVec: ArtifactsBySlotVec
+): LinearVec[] {
   const minmax = statsUpperLowerVec(artsVec)
   return linearUBExpanded(formulas, { ...minmax, keys: artsVec.keys })
 }
-export function linearUBExpanded(formulas: ExpandedFormulas, vMinMax: { lower: number[], upper: number[], keys: string[] }): LinearVec[] {
+export function linearUBExpanded(
+  formulas: ExpandedFormulas,
+  vMinMax: { lower: number[]; upper: number[]; keys: string[] }
+): LinearVec[] {
   const polys = polyUBExpanded(formulas, vMinMax)
   const { lower, upper, keys } = vMinMax
-  const minMax = Object.fromEntries(keys.map((k, i) => ([k, { min: lower[i], max: upper[i] }])))
+  const minMax = Object.fromEntries(
+    keys.map((k, i) => [k, { min: lower[i], max: upper[i] }])
+  )
   const lins = _linearUB(polys, minMax)
 
-  return lins.map(lin => ({ $c: lin.$c, weights: keys.map(k => lin[k] ?? 0) }))
+  return lins.map((lin) => ({
+    $c: lin.$c,
+    weights: keys.map((k) => lin[k] ?? 0),
+  }))
 }
 
-function _linearUB(polys: SumOfMonomials[], minMax: DynMinMax): Linear[] {
-  return polys.map(poly =>
-    weightedSum(...poly.map(mon => {
-      const bounds = mon.terms.map(key => minMax[key])
-      const { w, $c } = linbound(bounds, mon.$k >= 0 ? 'upper' : 'lower')
-      const linboi: Linear = { $c }
-      mon.terms.forEach((key, i) => linboi[key] = w[i] + (linboi[key] ?? 0))
-      return [mon.$k, linboi] as readonly [number, Linear]
-    }))
-  )
+export function _linearUB(
+  polys: SumOfMonomials[],
+  minMax: DynMinMax
+): Linear[] {
+  try {
+    return polys.map((poly) =>
+      weightedSum(
+        ...poly.map((mon) => {
+          const bounds = mon.terms.map((key) => minMax[key])
+          const { w, $c } = linboundv2(bounds, mon.$k >= 0 ? 'upper' : 'lower')
+          const linboi: Linear = { $c }
+          mon.terms.forEach(
+            (key, i) => (linboi[key] = w[i] + (linboi[key] ?? 0))
+          )
+          return [mon.$k, linboi] as readonly [number, Linear]
+        })
+      )
+    )
+  } catch (e) {
+    console.log('ERROR POLY: ', { polys, minMax })
+    throw e
+  }
 }
 
 /**
- * Constructs a linear upper bound for a monomial on a bounded domain using an LP.
+ * Constructs a linear upper or lower bound for a monomial on a bounded domain using an LP.
  *
  * Monomial is assumed to be
  *    m(x) = x1 * x2 * ... * xn
@@ -60,9 +88,12 @@ function _linearUB(polys: SumOfMonomials[], minMax: DynMinMax): Linear[] {
  *
  * @param bounds List of min/max bounds for each xi
  * @returns A linear function L(x) = w . x + $c
- *            satisfying      m(x) <= L(x) <= m(x) + err
+ *            satisfying      m(x) <= L(x) <= m(x) + err (resp. m(x) - err <= L(x) <= m(x))
  */
-function linbound(bounds: MinMax[], direction: ("upper" | "lower") = "upper"): { w: number[], $c: number, err: number } {
+function linbound(
+  bounds: MinMax[],
+  direction: 'upper' | 'lower' = 'upper'
+): { w: number[]; $c: number; err: number } {
   if (bounds.length === 0) return { w: [], $c: 1, err: 0 } // vacuous product is 0
   const nVar = bounds.length
 
@@ -73,34 +104,103 @@ function linbound(bounds: MinMax[], direction: ("upper" | "lower") = "upper"): {
 
   // Setting up the linear program in terms of constraints.
   //   cartesian(bounds) loops 2^nVar times
-  const cons = cartesian(...bounds.map(({ min, max }) => [min, max]))
-    .flatMap(coords => {
+  const cons = cartesian(...bounds.map(({ min, max }) => [min, max])).flatMap(
+    (coords) => {
       const prod = coords.reduce((prod, v) => prod * v, 1)
-      let lpRow: number[][];
+      let lpRow: number[][]
       if (direction === 'upper')
         lpRow = [
-          [...coords.map(v => -v), 1, 0, -prod],
+          [...coords.map((v) => -v), 1, 0, -prod],
           [...coords, -1, -1, prod],
         ]
       else if (direction === 'lower')
         lpRow = [
           [...coords, -1, 0, prod],
-          [...coords.map(v => -v), 1, -1, -prod],
+          [...coords.map((v) => -v), 1, -1, -prod],
         ]
       else assertUnreachable(direction)
       return lpRow
-    })
+    }
+  )
 
-  const objective = [...bounds.map(_ => 0), 0, 1]
+  const objective = [...bounds.map((_) => 0), 0, 1]
   try {
     const soln = solveLP(objective, cons)
     return {
-      w: soln.slice(0, nVar).map((wi, i) => wi * scaleProd / boundScale[i]),
+      w: soln.slice(0, nVar).map((wi, i) => (wi * scaleProd) / boundScale[i]),
       $c: -scaleProd * soln[nVar],
-      err: scaleProd * soln[nVar + 1]
+      err: scaleProd * soln[nVar + 1],
     }
+  } catch (e) {
+    console.log('ERROR on bounds', bounds)
+    console.log('Possibly numerical instability issue.')
+    console.log(e)
+    throw e
   }
-  catch (e) {
+}
+
+function linboundv2(
+  bounds: MinMax[],
+  direction: 'upper' | 'lower' = 'upper'
+): { w: number[]; $c: number; err: number } {
+  if (bounds.length === 0) return { w: [], $c: 1, err: 0 } // vacuous product is 0
+  const nVar = bounds.length
+
+  // Re-scale bounds to subset of [-1, 1] for numerical stability.
+  const boundScale = bounds.map(({ min, max }) => Math.max(-min, max))
+  const scaleProd = boundScale.reduce((prod, v) => prod * v, 1)
+  bounds = bounds.map(({ min, max }, i) => ({
+    min: min / boundScale[i],
+    max: max / boundScale[i],
+  }))
+
+  // Setting up the linear program in terms of constraints.
+  //   cartesian(bounds) loops 2^nVar times
+  const cons = cartesian(...bounds.map(({ min, max }) => [min, max])).flatMap(
+    (coords) => {
+      const prod = coords.reduce((prod, v) => prod * v, 1)
+      const sum = coords.reduce((sum, v) => sum + v, 0)
+      switch (direction) {
+        case 'upper':
+          return [
+            [...coords, -1, 0, sum - prod - nVar],
+            [...coords.map((v) => -v), 1, -1, nVar + prod - sum],
+          ]
+        case 'lower':
+          return [
+            [...coords.map((v) => -v), -1, 0, prod - sum - nVar],
+            [...coords, 1, -1, nVar + sum - prod],
+          ]
+        default:
+          assertUnreachable(direction)
+      }
+    }
+  )
+
+  const objective = [...bounds.map((_) => 0), 0, 1]
+  try {
+    const soln = solveLP(objective, cons)
+    switch (direction) {
+      case 'upper':
+        return {
+          w: soln
+            .slice(0, nVar)
+            .map((wi, i) => ((1 - wi) * scaleProd) / boundScale[i]),
+          $c: scaleProd * (soln[nVar] - nVar),
+          err: scaleProd * soln[nVar + 1],
+        }
+      case 'lower':
+        return {
+          w: soln
+            .slice(0, nVar)
+            .map((wi, i) => ((1 - wi) * scaleProd) / boundScale[i]),
+          $c: scaleProd * (nVar - soln[nVar]),
+          err: scaleProd * soln[nVar + 1],
+        }
+      default:
+        assertUnreachable(direction)
+    }
+  } catch (e) {
     console.log('ERROR on bounds', bounds)
     console.log('Possibly numerical instability issue.')
     console.log(e)

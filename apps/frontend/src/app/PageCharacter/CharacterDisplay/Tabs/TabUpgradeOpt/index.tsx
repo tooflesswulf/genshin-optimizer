@@ -14,40 +14,41 @@ import useDBMeta from '../../../../ReactHooks/useDBMeta';
 
 import React, { Suspense, useCallback, useContext, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { Trans } from "react-i18next";
-import { DataContext, dataContextObj } from '../../../../Context/DataContext';
+import type { dataContextObj } from '../../../../Context/DataContext';
+import { DataContext } from '../../../../Context/DataContext';
 import { DatabaseContext } from '../../../../Database/Database';
 import { optimize } from '../../../../Formula/optimization';
-import { NumNode } from '../../../../Formula/type';
+import type { NumNode } from '../../../../Formula/type';
 import useCharacterReducer from '../../../../ReactHooks/useCharacterReducer';
 import useCharSelectionCallback from '../../../../ReactHooks/useCharSelectionCallback';
 import useTeamData, { getTeamData } from '../../../../ReactHooks/useTeamData';
 import useBuildSetting from '../TabOptimize/useBuildSetting';
 import { dynamicData } from '../TabOptimize/foreground';
-import { allSlotKeys, CharacterKey, SlotKey } from '../../../../Types/consts';
+import type { CharacterKey, SlotKey } from '../../../../Types/consts';
+import { allSlotKeys } from '../../../../Types/consts';
 import { clamp, objectKeyMap, objPathValue } from '../../../../Util/Util';
 import { mergeData, uiDataForTeam } from '../../../../Formula/api';
 import { evalArtifact } from './evalArtifact';
-import { QueryArtifact, QueryBuild, UpgradeOptResult } from './artifactQueryTypes';
+import type { QueryArtifact, QueryBuild, UpgradeOptResult } from './artifactQueryTypes';
 import { querySetup, toQueryArtifact, cmpQuery } from './artifactQuery'
 import UpgradeOptChartCard from "./UpgradeOptChartCard"
 import { CheckBox, CheckBoxOutlineBlank } from '@mui/icons-material';
 import MainStatSelectionCard from '../TabOptimize/Components/MainStatSelectionCard';
 import { CharacterContext } from '../../../../Context/CharacterContext';
 import ArtifactLevelSlider from '../../../../Components/Artifact/ArtifactLevelSlider';
-import { ICachedArtifact } from '../../../../Types/artifact';
-import { DynStat } from "../../../../Solver/utils/common";
+import type { ICachedArtifact } from '../../../../Types/artifact';
+import type { DynStat } from "../../../../Solver/utils/common";
 import useMediaQueryUp from '../../../../ReactHooks/useMediaQueryUp';
-import { LocationCharacterKey, charKeyToLocCharKey } from '@genshin-optimizer/consts';
+import { charKeyToLocCharKey } from '@genshin-optimizer/consts';
 import useForceUpdate from '../../../../ReactHooks/useForceUpdate';
 import { defThreads } from '../../../../Database/DataEntries/DisplayOptimizeEntry';
 
 
 export default function TabUpopt() {
-  const { character, character: { key: characterKey } } = useContext(CharacterContext)
+  const { character: { key: characterKey } } = useContext(CharacterContext)
   const { database } = useContext(DatabaseContext)
   const { gender } = useDBMeta()
 
-  const characterDispatch = useCharacterReducer(characterKey)
   const onClickTeammate = useCharSelectionCallback()
 
   const noArtifact = useMemo(() => !database.arts.values.length, [database])
@@ -55,36 +56,48 @@ export default function TabUpopt() {
   const { buildSetting, buildSettingDispatch } = useBuildSetting(characterKey)
   const { optimizationTarget, levelLow, levelHigh } = buildSetting
   const teamData = useTeamData(characterKey)
-  const { characterSheet, target: data } = teamData?.[characterKey as CharacterKey] ?? {}
-  const isSM = ["xs", "sm"].includes(useMediaQueryUp())
+  const { target: data } = teamData?.[characterKey as CharacterKey] ?? {}
 
-  const [artsDirty, setArtsDirty] = useForceUpdate()
+  const [artsDirty] = useForceUpdate()
   // const [{ equipmentPriority, threads = defThreads }, setDisplayOptimize] = useState(database.displayOptimize.get())
-  const [{ threads = defThreads }, setDisplayOptimize] = useState(database.displayOptimize.get())
+  const [, setDisplayOptimize] = useState(database.displayOptimize.get())
   useEffect(() => database.displayOptimize.follow((_r, to) => setDisplayOptimize(to)), [database, setDisplayOptimize])
   const deferredArtsDirty = useDeferredValue(artsDirty)
   const deferredBuildSetting = useDeferredValue(buildSetting)
-  const { filteredArts, numEquippedUsed } = useMemo(() => {
-    const { mainStatKeys, allowLocations, artExclusion, levelLow, levelHigh } = deferredArtsDirty && deferredBuildSetting
+  const filteredArts = useMemo(() => {
+    const {
+      mainStatKeys,
+      excludedLocations,
+      artExclusion,
+      levelLow,
+      levelHigh,
+      allowLocationsState,
+      useExcludedArts,
+    } = deferredArtsDirty && deferredBuildSetting
 
-    let numEquippedUsed = 0
-    const filteredArts = database.arts.values.filter(art => {
-      if (artExclusion.includes(art.id)) return false
+    return database.arts.values.filter((art) => {
+      if (!useExcludedArts && artExclusion.includes(art.id)) return false
       if (art.level < levelLow) return false
       if (art.level > levelHigh) return false
       const mainStats = mainStatKeys[art.slotKey]
-      if (mainStats?.length && !mainStats.includes(art.mainStatKey)) return false
+      if (mainStats?.length && !mainStats.includes(art.mainStatKey))
+        return false
 
       const locKey = charKeyToLocCharKey(characterKey)
-      if (art.location && art.location !== locKey) {
-        if (!allowLocations.includes(art.location)) return false
-        numEquippedUsed++
-      }
+      const unequippedStateAndEquippedElsewhere =
+        allowLocationsState === 'unequippedOnly' &&
+        art.location &&
+        art.location !== locKey
+      const customListStateAndNotOnList =
+        allowLocationsState === 'customList' &&
+        art.location &&
+        art.location !== locKey &&
+        excludedLocations.includes(art.location)
+      if (unequippedStateAndEquippedElsewhere || customListStateAndNotOnList)
+        return false
 
       return true
     })
-
-    return { filteredArts, numEquippedUsed }
   }, [database, characterKey, deferredArtsDirty, deferredBuildSetting])
   const filteredArtIdMap = useMemo(() => objectKeyMap(filteredArts.map(({ id }) => id), _ => true), [filteredArts])
 
