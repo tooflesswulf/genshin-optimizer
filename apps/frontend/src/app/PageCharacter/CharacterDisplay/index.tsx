@@ -220,6 +220,7 @@ function CharacterPanel() {
         <Route path="/teambuffs" element={<TabTeambuffs />} />
         <Route path="/optimize" element={<TabBuild />} />
         <Route path="/theorycraft" element={<TabTheorycraft />} />
+        <Route path="/upopt" element={<TabUpopt />} />
       </Routes>
     </Suspense>
   )

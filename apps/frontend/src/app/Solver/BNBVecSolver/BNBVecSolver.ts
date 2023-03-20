@@ -1,14 +1,17 @@
 import { allArtifactSlotKeys } from "@genshin-optimizer/consts"
-import { Done, Finalize, FinalizeResult, Interim, OptProblemInput, Threshold } from ".."
-import { OptNode, optimize } from "../../Formula/optimization"
-import { ArtifactsBySlot, pruneAll, pruneExclusion } from "../utils/common"
+import type { Done, Finalize, FinalizeResult, Interim, OptProblemInput, Threshold } from ".."
+import type { OptNode} from "../../Formula/optimization";
+import { optimize } from "../../Formula/optimization"
+import type { ArtifactsBySlot} from "../utils/common";
+import { pruneAll, pruneExclusion } from "../utils/common"
 import { WorkerCoordinator } from "../coordinator"
-import { ArtSetExclusionFull, ArtifactsBySlotVec, applyLinAppx, statsUpperLowerVec, toArtifactsBySlotVec } from "../utils/commonVec"
+import type { ArtSetExclusionFull, ArtifactsBySlotVec} from "../utils/commonVec";
+import { applyLinAppx, statsUpperLowerVec, toArtifactsBySlotVec } from "../utils/commonVec"
 import { elimLinDepStats, thresholdExclusions, thresholdToConstBranchForm } from "../utils/preprocessing"
 import { objectKeyMap, objectKeyValueMap, range } from "../../Util/Util"
 import { expandFormulas } from "../utils/expandFormula"
 import { linearUBExpandedVec } from "../utils/linearUB"
-import { BNBRequestFilter, BNBSubproblem } from "./bnbSubproblem"
+import type { BNBRequestFilter, BNBSubproblem } from "./bnbSubproblem"
 
 export class BNBVecSolver extends WorkerCoordinator<BNBCommand, BNBResult> {
   private status: Record<'tested' | 'failed' | 'skipped' | 'total', number>
@@ -29,7 +32,7 @@ export class BNBVecSolver extends WorkerCoordinator<BNBCommand, BNBResult> {
 
           const i = this.prio.get('enumerate')!
           const numToPop = Math.ceil(this.commands[i].length / numWorker)
-          const toPostArr = range(1, numToPop).map(_ => this.commands[i].dequeue()! as EnumerateBNB)
+          const toPostArr = range(1, numToPop).map(_ => this.commands[i].pop()! as EnumerateBNB)
           toPostArr.forEach(toPost => {
             toPost.interrupt = true
             w.postMessage(toPost)
