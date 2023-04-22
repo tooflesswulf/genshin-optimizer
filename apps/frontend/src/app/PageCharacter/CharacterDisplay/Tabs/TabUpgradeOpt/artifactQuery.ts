@@ -23,8 +23,7 @@ function toStats(build: QueryBuild): DynStat {
 export function querySetup(
   formulas: OptNode[],
   thresholds: number[],
-  curBuild: QueryBuild,
-  data: Data = {}
+  curBuild: QueryBuild
 ): Query {
   const toEval: OptNode[] = []
   formulas.forEach((f) => {
@@ -33,9 +32,7 @@ export function querySetup(
       ...allSubstatKeys.map((sub) => ddx(f, (fo) => fo.path[1], sub))
     )
   })
-  // Opt loop a couple times to ensure all constants folded?
-  let evalOpt = optimize(toEval, data, ({ path: [p] }) => p !== 'dyn')
-  evalOpt = optimize(evalOpt, data, ({ path: [p] }) => p !== 'dyn')
+  const evalOpt = optimize(toEval, {}, (_) => false)
 
   const evalFn = precompute(evalOpt, {}, (f) => f.path[1], 1)
   const stats = toStats(curBuild)
