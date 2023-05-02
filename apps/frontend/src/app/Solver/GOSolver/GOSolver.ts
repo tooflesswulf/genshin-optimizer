@@ -50,16 +50,63 @@ export class GOSolver extends WorkerCoordinator<WorkerCommand, WorkerResult> {
     this.status.total = NaN
     this.buildValues = Array(topN).fill({ w: undefined as any, val: -Infinity })
 
-    this.notifiedBroadcast(this.preprocess(problem))
+    this.broadcastCommand(this.preprocess(problem))
   }
 
   async solve() {
+    await this.execute([])
+    this.listenEmpty()
+    this.listenCommandOverflow()
+
     const { exclusion, maxIterateSize } = this
     this.finalizedResults = []
     await this.execute([{ command: 'count', exclusion, maxIterateSize }])
-    this.notifiedBroadcast({ command: 'finalize' })
+    this.broadcastCommand({ command: 'finalize' })
     await this.execute([])
     return this.finalizedResults
+  }
+
+  shareOnIdle() {
+    const numIdle = this.numIdleWorkers()
+    if (numIdle > 0) {
+      this.broadcastMessage({
+        command: 'workerRecvMessage',
+        from: 'master',
+        data: {
+          dataType: 'share',
+          numShare: 1,
+          maxIterateSize: this.maxIterateSize,
+        },
+      })
+    }
+    setTimeout(() => this.listenEmpty(), 1000)
+  }
+  listenEmpty() {
+    new Promise((res) => (this.notifyEmpty = () => res(true))).then(() =>
+      this.shareOnIdle()
+    )
+  }
+
+  overflowWorkers = [] as (() => void)[]
+  listenCommandOverflow() {
+    new Promise((res) => (this.notifyCommandOverflow = () => res(true))).then(
+      () => {
+        // commands[0] is iterate()
+        if (this.commands[0].length < this.workers.length) {
+          this.listenCommandOverflow()
+          return
+        }
+
+        this._workers.forEach((w, i) => {
+          const command = this.commands[0].pop()
+          if (command === undefined) return
+
+          this.sendCommand(command, i)
+        })
+
+        this.listenCommandOverflow()
+      }
+    )
   }
 
   preprocess({
@@ -120,7 +167,11 @@ export class GOSolver extends WorkerCoordinator<WorkerCommand, WorkerResult> {
 
       const threshold = this.buildValues[topN - 1].val ?? -Infinity
       if (oldThreshold !== threshold)
-        this.broadcast({ command: 'threshold', threshold })
+        this.broadcastMessage({
+          command: 'workerRecvMessage',
+          from: 'master',
+          data: { dataType: 'threshold', threshold },
+        })
     }
   }
 }
