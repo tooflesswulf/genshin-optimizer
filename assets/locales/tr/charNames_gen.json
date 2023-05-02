@@ -64,6 +64,7 @@
   "Yaoyao": "Yaoyao",
   "Alhaitham": "Alhaitham",
   "Dehya": "Dehya",
+  "Mika": "Mika",
   "TravelerAnemoF": "Lumine (Rüzgar)",
   "TravelerGeoF": "Lumine (Toprak)",
   "TravelerElectroF": "Lumine (Elektrik)",
@@ -71,5 +72,6 @@
   "TravelerAnemoM": "Aether (Rüzgar)",
   "TravelerGeoM": "Aether (Toprak)",
   "TravelerElectroM": "Aether (Elektrik)",
-  "TravelerDendroM": "Aether (Doğa)"
+  "TravelerDendroM": "Aether (Doğa)",
+  "Somnia": "Somnia"
 }
