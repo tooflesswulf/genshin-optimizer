@@ -1,4 +1,5 @@
-import type { WorkerCommand, WorkerResult } from '..'
+import type { MessageData, WorkerCommand, WorkerResult } from '..'
+import type { WorkerRecvMessage, WorkerSendMessage } from '../coordinator'
 import { assertUnreachable } from '../../Util/Util'
 import type { RequestFilter } from '../common'
 import {
@@ -11,13 +12,35 @@ import { BNBSplitWorker } from './BNBSplitWorker'
 import { ComputeWorker } from './ComputeWorker'
 import { DefaultSplitWorker } from './DefaultSplitWorker'
 
-declare function postMessage(command: WorkerCommand | WorkerResult): void
+declare function postMessage(
+  command: WorkerCommand | WorkerResult | WorkerSendMessage<MessageData>
+): void
 
 let splitWorker: SplitWorker, computeWorker: ComputeWorker
 
-async function handleEvent(e: MessageEvent<WorkerCommand>): Promise<void> {
-  const { data } = e,
-    { command } = data
+function handleMessage(msg: WorkerRecvMessage<MessageData>) {
+  const { data } = msg
+
+  switch (data.dataType) {
+    case 'threshold':
+      splitWorker.setThreshold(data.threshold)
+      computeWorker.setThreshold(data.threshold)
+      break
+    case 'share': {
+      const filters = splitWorker.popFilters(data.numShare)
+      filters.forEach((filter) =>
+        postMessage({
+          command: 'split',
+          filter,
+          maxIterateSize: data.maxIterateSize,
+        })
+      )
+      break
+    }
+  }
+}
+async function executeCommand(data: WorkerCommand): Promise<void> {
+  const { command } = data
   switch (command) {
     case 'split':
       for (const filter of splitWorker.split(
@@ -25,7 +48,7 @@ async function handleEvent(e: MessageEvent<WorkerCommand>): Promise<void> {
         data.maxIterateSize
       )) {
         postMessage({ command: 'iterate', filter })
-        // Suspend here in case a `threshold` is sent over
+        // Suspend here in case a `message` is sent over
         //
         // Make sure to use task-based mechanisms such as `setTimeout` so that
         // this function suspends until the next event loop. If we instead use
@@ -37,11 +60,6 @@ async function handleEvent(e: MessageEvent<WorkerCommand>): Promise<void> {
     case 'iterate':
       computeWorker.compute(data.filter)
       break
-    case 'threshold': {
-      splitWorker.setThreshold(data.threshold)
-      computeWorker.setThreshold(data.threshold)
-      return // This is a fire-and-forget command
-    }
     case 'finalize': {
       computeWorker.refresh(true)
       const { builds, plotData } = computeWorker
@@ -80,15 +98,24 @@ async function handleEvent(e: MessageEvent<WorkerCommand>): Promise<void> {
   }
   postMessage({ resultType: 'done' })
 }
-onmessage = async (e: MessageEvent<WorkerCommand>) => {
+
+onmessage = async (
+  e: MessageEvent<WorkerCommand | WorkerRecvMessage<MessageData>>
+) => {
   try {
-    await handleEvent(e)
+    if (e.data.command === 'workerRecvMessage') {
+      handleMessage(e.data)
+      return
+    }
+
+    await executeCommand(e.data)
   } catch (e) {
     postMessage({ resultType: 'err', message: (e as any).message })
   }
 }
 
 export interface SplitWorker {
-  split(filter: RequestFilter, minCount: number): Iterable<RequestFilter>
+  popFilters(n: number): RequestFilter[]
+  split(filter: RequestFilter, minCount: number): Generator<RequestFilter>
   setThreshold(newThreshold: number): void
 }

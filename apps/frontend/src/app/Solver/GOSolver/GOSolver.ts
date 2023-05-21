@@ -50,16 +50,64 @@ export class GOSolver extends WorkerCoordinator<WorkerCommand, WorkerResult> {
     this.status.total = NaN
     this.buildValues = Array(topN).fill({ w: undefined as any, val: -Infinity })
 
-    this.notifiedBroadcast(this.preprocess(problem))
+    this.broadcastCommand(this.preprocess(problem))
   }
 
   async solve() {
+    await this.execute([])
+    this.listenEmpty()
+    this.listenCommandOverflow()
+
     const { exclusion, maxIterateSize } = this
     this.finalizedResults = []
     await this.execute([{ command: 'count', exclusion, maxIterateSize }])
-    this.notifiedBroadcast({ command: 'finalize' })
+    this.broadcastCommand({ command: 'finalize' })
     await this.execute([])
     return this.finalizedResults
+  }
+
+  listenEmpty() {
+    new Promise((res) => (this.notifyEmpty = () => res(true))).then(() => {
+      const numIdle = this.numIdleWorkers()
+      if (numIdle > 0) {
+        this.broadcastMessage({
+          command: 'workerRecvMessage',
+          from: 'master',
+          data: {
+            dataType: 'share',
+            numShare: 1,
+            maxIterateSize: this.maxIterateSize,
+          },
+        })
+      }
+      setTimeout(() => this.listenEmpty(), 1000)
+    })
+  }
+
+  listenCommandOverflow() {
+    new Promise((res) => (this.notifyCommandOverflow = () => res(true))).then(
+      () => {
+        // commands[0] is iterate()
+        if (this.commands[0].length < this.workers.length) {
+          this.listenCommandOverflow()
+          return
+        }
+
+        while (this.commands[0].length > this._workers.length) {
+          const { ix } = this._workers.reduce(
+            (prev, w, ix) => {
+              const tasks = this.workerTracker.get(w)!.tasks
+              return tasks < prev.tasks ? { ix, tasks } : prev
+            },
+            { ix: NaN, tasks: Infinity }
+          )
+
+          const command = this.commands[0].pop()!
+          this.sendCommand(command, ix)
+        }
+        setTimeout(() => this.listenCommandOverflow(), 0)
+      }
+    )
   }
 
   preprocess({
@@ -120,7 +168,11 @@ export class GOSolver extends WorkerCoordinator<WorkerCommand, WorkerResult> {
 
       const threshold = this.buildValues[topN - 1].val ?? -Infinity
       if (oldThreshold !== threshold)
-        this.broadcast({ command: 'threshold', threshold })
+        this.broadcastMessage({
+          command: 'workerRecvMessage',
+          from: 'master',
+          data: { dataType: 'threshold', threshold },
+        })
     }
   }
 }

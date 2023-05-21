@@ -12,13 +12,7 @@ export type OptProblemInput = {
   plotBase?: OptNode
 }
 
-export type WorkerCommand =
-  | Setup
-  | Split
-  | Iterate
-  | Threshold
-  | Finalize
-  | Count
+export type WorkerCommand = Setup | Split | Iterate | Finalize | Count
 export type WorkerResult = Interim | CountResult | FinalizeResult | Done | Error
 
 export interface Setup {
@@ -39,10 +33,6 @@ export interface Split {
 export interface Iterate {
   command: 'iterate'
   filter: RequestFilter
-}
-export interface Threshold {
-  command: 'threshold'
-  threshold: number
 }
 export interface Finalize {
   command: 'finalize'
@@ -76,4 +66,15 @@ export interface Interim {
   /** The number of builds that does not meet the min-filter requirement since last report */
   failed: number
   skipped: number
+}
+
+export type MessageData = Threshold | ShareRequest
+export interface Threshold {
+  dataType: 'threshold'
+  threshold: number
+}
+export interface ShareRequest {
+  dataType: 'share'
+  numShare: number
+  maxIterateSize: number
 }
